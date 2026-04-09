@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 struct ContentView: View {
     @EnvironmentObject var manager: PluginManager
@@ -42,6 +43,14 @@ struct SidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            Button(action: manager.testAllUntested) {
+                Label("Test All Plugins", systemImage: "play.rectangle")
+            }
+            .disabled(manager.isScanning)
+            .help("Test all plugins")
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
             // Stats bar
             StatsBar()
                 .padding(.horizontal, 12)
@@ -64,9 +73,18 @@ struct SidebarView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(manager.filteredPlugins, selection: $selectedPlugin) { plugin in
-                        PluginRowView(plugin: plugin)
-                            .tag(plugin)
+                    List(selection: $selectedPlugin) {
+                        ForEach(PluginType.allCases, id: \.self) { type in
+                            let pluginsOfType = manager.filteredPlugins.filter { $0.type == type }
+                            if !pluginsOfType.isEmpty {
+                                Section(header: Text(type.rawValue)) {
+                                    ForEach(pluginsOfType) { plugin in
+                                        PluginRowView(plugin: plugin)
+                                            .tag(plugin)
+                                    }
+                                }
+                            }
+                        }
                     }
                     .listStyle(.sidebar)
                 }
@@ -390,4 +408,3 @@ struct PluginDetailView: View {
         }
     }
 }
-

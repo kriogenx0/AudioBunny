@@ -65,3 +65,5 @@ fastlane/test_output
 .swiftpm/
 *.o
 *.d
+
+.DS_Store
