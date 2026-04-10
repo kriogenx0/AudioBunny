@@ -2,6 +2,7 @@ import Foundation
 import AVFoundation
 import AudioToolbox
 import Combine
+import AppKit
 
 // MARK: - Plugin Manager
 
@@ -40,6 +41,7 @@ class PluginManager: ObservableObject {
     var filteredPlugins: [AudioPlugin] {
         plugins.filter { plugin in
             let matchesType = filterType == nil || plugin.type == filterType
+            // Search by name or creator (manufacturer), case-insensitive
             let matchesSearch = searchText.isEmpty ||
                 plugin.name.localizedCaseInsensitiveContains(searchText) ||
                 plugin.manufacturer.localizedCaseInsensitiveContains(searchText)
@@ -302,7 +304,7 @@ class PluginManager: ObservableObject {
 
     private func movePlugin(_ plugin: AudioPlugin, toDisabled: Bool) async {
         let fm = FileManager.default
-        let source = plugin.fileURL
+        var source = plugin.fileURL
 
         if toDisabled {
             // Ensure disabled folder exists
@@ -315,6 +317,7 @@ class PluginManager: ObservableObject {
                 try fm.moveItem(at: source, to: destination)
                 plugin.status = .disabled
             } catch {
+                // Moving failed, print error only
                 print("Failed to disable \(plugin.name): \(error)")
             }
         } else {
