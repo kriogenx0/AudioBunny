@@ -14,7 +14,7 @@ struct ContentView: View {
     var body: some View {
         Group {
             if activeTab == .library {
-                NavigationSplitView {
+                NavigationSplitView(columnVisibility: .constant(.all)) {
                     SidebarView(selectedPlugin: $selectedPlugin)
                 } detail: {
                     if let plugin = selectedPlugin {
@@ -123,7 +123,7 @@ struct SidebarView: View {
         }
         .searchable(text: $manager.searchText, prompt: "Search plugins")
         .navigationTitle("AudioBunny")
-        .frame(minWidth: 300)
+        .frame(minWidth: 330)
     }
 }
 
@@ -135,12 +135,14 @@ struct StatsBar: View {
     var body: some View {
         let counts = manager.pluginCounts
         HStack(spacing: 16) {
-            statItem(counts.total, label: "Total", color: .primary)
             statItem(counts.active, label: "Active", color: .green)
             statItem(counts.failed, label: "Failed", color: .red)
             statItem(counts.disabled, label: "Disabled", color: .secondary)
             statItem(counts.untested, label: "Untested", color: .orange)
+            Spacer()
+            statItem(counts.total, label: "Total", color: .primary)
         }
+        .frame(maxWidth: .infinity)
         .font(.caption)
     }
 
