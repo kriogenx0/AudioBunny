@@ -29,6 +29,14 @@ struct CatalogPlugin: Identifiable, Codable, Hashable {
     let version: String
     let websiteURL: String
     let price: String
+
+    /// Direct URL to a zip/pkg/dmg download.
+    let downloadURL: String?
+    /// GitHub "owner/repo" — used to resolve the latest release asset at runtime.
+    let githubRepo: String?
+
+    /// True when an automated install path exists.
+    var isDownloadable: Bool { downloadURL != nil || githubRepo != nil }
 }
 
 // MARK: - Catalog Response

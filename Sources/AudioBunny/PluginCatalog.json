@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "plugins": [
     {
       "id": "vital",
@@ -11,7 +11,9 @@
       "tags": ["synth", "wavetable", "polyphonic"],
       "version": "1.5.5",
       "websiteURL": "https://vital.audio",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "surge-xt",
@@ -23,7 +25,9 @@
       "tags": ["synth", "hybrid", "open-source"],
       "version": "1.3.4",
       "websiteURL": "https://surge-synthesizer.github.io",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": "surge-synthesizer/surge"
     },
     {
       "id": "dexed",
@@ -35,7 +39,9 @@
       "tags": ["FM", "synth", "vintage", "open-source"],
       "version": "0.9.6",
       "websiteURL": "https://asb2m10.github.io/dexed/",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": "asb2m10/dexed"
     },
     {
       "id": "odin2",
@@ -47,7 +53,9 @@
       "tags": ["synth", "semi-modular", "wavetable", "open-source"],
       "version": "2.3.4",
       "websiteURL": "https://www.thewavewarden.com/odin2",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": "TheWaveWarden/odin2"
     },
     {
       "id": "ob-xd",
@@ -59,7 +67,9 @@
       "tags": ["synth", "analog", "vintage", "Oberheim"],
       "version": "2.8",
       "websiteURL": "https://www.discodsp.com/obxd/",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "tal-noisemaker",
@@ -71,7 +81,9 @@
       "tags": ["synth", "analog", "arpeggiator"],
       "version": "4.0",
       "websiteURL": "https://tal-software.com/products/tal-noisemaker",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "helm",
@@ -83,7 +95,9 @@
       "tags": ["synth", "polyphonic", "open-source"],
       "version": "0.9.0",
       "websiteURL": "https://tytel.org/helm/",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": "mtytel/helm"
     },
     {
       "id": "tdr-nova",
@@ -95,7 +109,9 @@
       "tags": ["EQ", "dynamics", "mastering"],
       "version": "2.2.4",
       "websiteURL": "https://www.tokyodawn.net/tdr-nova/",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "tal-reverb-4",
@@ -107,7 +123,9 @@
       "tags": ["reverb", "plate", "vintage"],
       "version": "1.5",
       "websiteURL": "https://tal-software.com/products/tal-reverb",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "span",
@@ -119,7 +137,9 @@
       "tags": ["analyzer", "spectrum", "metering"],
       "version": "3.18",
       "websiteURL": "https://www.voxengo.com/product/span/",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "limiter6",
@@ -131,7 +151,9 @@
       "tags": ["limiter", "mastering", "dynamics", "compressor"],
       "version": "1.2",
       "websiteURL": "https://vladg.net/plugin/limiter-no6",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "ozone-imager",
@@ -143,7 +165,9 @@
       "tags": ["stereo", "imaging", "mastering"],
       "version": "2.00",
       "websiteURL": "https://www.izotope.com/en/products/ozone-imager.html",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "dragonfly-reverb",
@@ -155,7 +179,9 @@
       "tags": ["reverb", "open-source", "room", "hall"],
       "version": "3.2.10",
       "websiteURL": "https://github.com/michaelwillis/dragonfly-reverb",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": "michaelwillis/dragonfly-reverb"
     },
     {
       "id": "mfreefxbundle",
@@ -167,7 +193,9 @@
       "tags": ["bundle", "EQ", "dynamics", "modulation"],
       "version": "16.12",
       "websiteURL": "https://www.meldaproduction.com/MFreeFXBundle",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     },
     {
       "id": "tal-chorus-lx",
@@ -179,7 +207,9 @@
       "tags": ["chorus", "vintage", "Roland", "stereo"],
       "version": "2.1",
       "websiteURL": "https://tal-software.com/products/tal-chorus-lx",
-      "price": "Free"
+      "price": "Free",
+      "downloadURL": null,
+      "githubRepo": null
     }
   ]
 }

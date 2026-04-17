@@ -5,6 +5,7 @@ import SwiftUI
 struct StoreView: View {
     @EnvironmentObject var manager: PluginManager
     @EnvironmentObject var catalogManager: CatalogManager
+    @EnvironmentObject var downloadManager: DownloadManager
     @State private var selectedPlugin: CatalogPlugin? = nil
 
     var body: some View {
@@ -31,7 +32,6 @@ struct CatalogSidebarView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Stats bar
             CatalogStatsBar()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -39,14 +39,12 @@ struct CatalogSidebarView: View {
 
             Divider()
 
-            // Filters
             CatalogFilterBar()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
 
             Divider()
 
-            // Plugin list
             let plugins = catalogManager.filteredPlugins(installedPlugins: manager.plugins)
             if plugins.isEmpty {
                 Text("No plugins found")
@@ -102,7 +100,6 @@ struct CatalogFilterBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Category filter
             HStack(spacing: 6) {
                 Text("Type:")
                     .foregroundStyle(.secondary)
@@ -117,7 +114,6 @@ struct CatalogFilterBar: View {
                 }
             }
 
-            // Format filter
             HStack(spacing: 6) {
                 Text("Format:")
                     .foregroundStyle(.secondary)
@@ -159,6 +155,7 @@ struct CatalogPluginRowView: View {
     let plugin: CatalogPlugin
     @EnvironmentObject var manager: PluginManager
     @EnvironmentObject var catalogManager: CatalogManager
+    @EnvironmentObject var downloadManager: DownloadManager
 
     var body: some View {
         HStack(spacing: 10) {
@@ -178,7 +175,19 @@ struct CatalogPluginRowView: View {
 
             Spacer()
 
-            if catalogManager.isInstalled(plugin, in: manager.plugins) {
+            // Right-side indicator
+            if let state = downloadManager.states[plugin.id] {
+                if state.isFailed {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(.red)
+                        .font(.caption)
+                } else {
+                    ProgressView(value: state.progressFraction)
+                        .progressViewStyle(.circular)
+                        .scaleEffect(0.6)
+                        .frame(width: 20, height: 20)
+                }
+            } else if catalogManager.isInstalled(plugin, in: manager.plugins) {
                 Text("Installed")
                     .font(.caption2)
                     .fontWeight(.medium)
@@ -187,6 +196,10 @@ struct CatalogPluginRowView: View {
                     .background(Color.green.opacity(0.2))
                     .foregroundStyle(.green)
                     .cornerRadius(4)
+            } else if plugin.isDownloadable {
+                Image(systemName: "arrow.down.circle")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
             }
         }
         .padding(.vertical, 2)
@@ -203,6 +216,7 @@ struct CatalogPluginDetailView: View {
     let plugin: CatalogPlugin
     @EnvironmentObject var manager: PluginManager
     @EnvironmentObject var catalogManager: CatalogManager
+    @EnvironmentObject var downloadManager: DownloadManager
 
     private var installedPlugin: AudioPlugin? {
         catalogManager.installedPlugin(for: plugin, in: manager.plugins)
@@ -227,7 +241,6 @@ struct CatalogPluginDetailView: View {
                         Text(plugin.developer)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 6) {
-                            // Category badge
                             Text(plugin.category.rawValue)
                                 .font(.caption)
                                 .padding(.horizontal, 8)
@@ -236,7 +249,6 @@ struct CatalogPluginDetailView: View {
                                 .foregroundStyle(categoryColor)
                                 .cornerRadius(6)
 
-                            // Format chips
                             ForEach(plugin.formats, id: \.self) { format in
                                 Text(format)
                                     .font(.caption)
@@ -247,7 +259,6 @@ struct CatalogPluginDetailView: View {
                                     .cornerRadius(6)
                             }
 
-                            // Price
                             Text(plugin.price)
                                 .font(.caption)
                                 .fontWeight(.medium)
@@ -271,7 +282,7 @@ struct CatalogPluginDetailView: View {
                         .padding(4)
                 }
 
-                // Details table
+                // Details
                 GroupBox("Details") {
                     VStack(spacing: 0) {
                         infoRow("Developer", plugin.developer)
@@ -288,41 +299,7 @@ struct CatalogPluginDetailView: View {
                 // Actions
                 GroupBox("Actions") {
                     VStack(alignment: .leading, spacing: 12) {
-                        if let installed = installedPlugin {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("Installed — \(installed.type.rawValue)")
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Divider()
-
-                            Button(role: .destructive, action: { manager.deletePlugin(installed) }) {
-                                Label("Uninstall Plugin", systemImage: "trash")
-                            }
-                            .buttonStyle(.bordered)
-
-                            Text("Permanently removes the plugin file from your system.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Button(action: { catalogManager.openWebsite(plugin) }) {
-                                Label("Get Plugin", systemImage: "arrow.down.circle")
-                            }
-                            .buttonStyle(.borderedProminent)
-
-                            Text("Opens the developer's website to download and install this plugin.")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Divider()
-
-                        Button(action: { catalogManager.openWebsite(plugin) }) {
-                            Label("Visit Website", systemImage: "safari")
-                        }
-                        .buttonStyle(.bordered)
+                        actionsContent
                     }
                     .padding(4)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -334,6 +311,125 @@ struct CatalogPluginDetailView: View {
         }
         .navigationTitle(plugin.name)
     }
+
+    // MARK: Actions panel
+
+    @ViewBuilder
+    private var actionsContent: some View {
+        if let state = downloadManager.states[plugin.id] {
+            // Active download / install in progress (or error)
+            installProgressPanel(state)
+        } else if let installed = installedPlugin {
+            // Already installed
+            installedPanel(installed)
+        } else if plugin.isDownloadable {
+            // Can be installed automatically
+            downloadablePanel
+        } else {
+            // Website-only
+            websiteOnlyPanel
+        }
+
+        Divider()
+
+        Button(action: { catalogManager.openWebsite(plugin) }) {
+            Label("Visit Website", systemImage: "safari")
+        }
+        .buttonStyle(.bordered)
+    }
+
+    @ViewBuilder
+    private func installProgressPanel(_ state: InstallState) -> some View {
+        if state.isFailed {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                Text(state.label)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 8) {
+                Button("Retry") {
+                    downloadManager.dismissError(for: plugin.id)
+                    downloadManager.install(plugin)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Dismiss") {
+                    downloadManager.dismissError(for: plugin.id)
+                }
+                .buttonStyle(.bordered)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                ProgressView(value: state.progressFraction) {
+                    Text(state.label)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .progressViewStyle(.linear)
+
+                Button("Cancel") {
+                    downloadManager.cancel(plugin.id)
+                }
+                .buttonStyle(.bordered)
+                .tint(.orange)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func installedPanel(_ installed: AudioPlugin) -> some View {
+        HStack {
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+            Text("Installed — \(installed.type.rawValue)")
+                .foregroundStyle(.secondary)
+        }
+
+        Divider()
+
+        Button(role: .destructive) {
+            manager.deletePlugin(installed)
+        } label: {
+            Label("Uninstall Plugin", systemImage: "trash")
+        }
+        .buttonStyle(.bordered)
+
+        Text("Permanently removes the plugin file from your system.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private var downloadablePanel: some View {
+        Button {
+            downloadManager.install(plugin)
+        } label: {
+            Label("Install", systemImage: "arrow.down.circle.fill")
+        }
+        .buttonStyle(.borderedProminent)
+
+        Text(plugin.githubRepo != nil
+             ? "Fetches the latest release from GitHub and installs it automatically."
+             : "Downloads and installs the plugin automatically.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private var websiteOnlyPanel: some View {
+        Button(action: { catalogManager.openWebsite(plugin) }) {
+            Label("Get Plugin", systemImage: "arrow.up.right.square")
+        }
+        .buttonStyle(.borderedProminent)
+
+        Text("Opens the developer's website to download and install manually.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    // MARK: Helpers
 
     @ViewBuilder
     private func infoRow(_ label: String, _ value: String) -> some View {
