@@ -57,6 +57,22 @@ struct SidebarView: View {
 
             Divider()
 
+            // Disable all failing button (shown only when there are failing plugins)
+            let failedCount = manager.pluginCounts.failed
+            if failedCount > 0 {
+                Button(action: manager.disableAllFailing) {
+                    Label("Disable \(failedCount) Failing Plugin\(failedCount == 1 ? "" : "s")", systemImage: "xmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .disabled(manager.isScanning)
+
+                Divider()
+            }
+
             // Plugin list with overlayed scanning indicator
             ZStack {
                 if manager.filteredPlugins.isEmpty {

@@ -288,6 +288,18 @@ class PluginManager: ObservableObject {
 
     // MARK: - Disable / Enable
 
+    func disableAllFailing() {
+        Task {
+            let failing = plugins.filter {
+                if case .failed = $0.status { return true }
+                return false
+            }
+            for plugin in failing {
+                await movePlugin(plugin, toDisabled: true)
+            }
+        }
+    }
+
     func disablePlugin(_ plugin: AudioPlugin) {
         Task {
             await movePlugin(plugin, toDisabled: true)
