@@ -255,34 +255,32 @@ class PluginManager: ObservableObject {
             return
         }
 
-        // Try loading the bundle
-        guard let bundle = Bundle(url: url) else {
-            plugin.status = .failed("Cannot create bundle")
+        guard let bundle = Bundle(url: url),
+              let executableURL = bundle.executableURL else {
+            plugin.status = .failed("Cannot find bundle executable")
             return
         }
 
-        guard bundle.load() else {
-            plugin.status = .failed("Bundle failed to load")
-            return
-        }
+        // Use nm to inspect the symbol table without loading the plugin code,
+        // avoiding crashes from buggy plugin initializers (EXC_BAD_ACCESS).
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/nm")
+        process.arguments = ["-g", "--defined-only", executableURL.path]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
 
-        // Check for the required VST entry point symbol
-        let handle = dlopen(bundle.executableURL?.path, RTLD_LAZY | RTLD_LOCAL)
-        if handle == nil {
-            let errMsg = String(cString: dlerror())
-            bundle.unload()
-            plugin.status = .failed("dlopen: \(errMsg)")
-            return
-        }
-
-        let sym = dlsym(handle, expectedSymbol)
-        dlclose(handle)
-        bundle.unload()
-
-        if sym != nil {
-            plugin.status = .active
-        } else {
-            plugin.status = .failed("Missing entry point '\(expectedSymbol)'")
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            if output.contains(expectedSymbol) {
+                plugin.status = .active
+            } else {
+                plugin.status = .failed("Missing entry point '\(expectedSymbol)'")
+            }
+        } catch {
+            plugin.status = .failed("Cannot inspect binary: \(error.localizedDescription)")
         }
     }
 
