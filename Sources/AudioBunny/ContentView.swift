@@ -1,34 +1,58 @@
 import SwiftUI
 
+enum AppTab {
+    case library
+    case browse
+}
+
 struct ContentView: View {
     @EnvironmentObject var manager: PluginManager
+    @EnvironmentObject var catalogManager: CatalogManager
     @State private var selectedPlugin: AudioPlugin? = nil
+    @State private var activeTab: AppTab = .library
 
     var body: some View {
-        NavigationSplitView {
-            SidebarView(selectedPlugin: $selectedPlugin)
-        } detail: {
-            if let plugin = selectedPlugin {
-                PluginDetailView(plugin: plugin)
+        Group {
+            if activeTab == .library {
+                NavigationSplitView {
+                    SidebarView(selectedPlugin: $selectedPlugin)
+                } detail: {
+                    if let plugin = selectedPlugin {
+                        PluginDetailView(plugin: plugin)
+                    } else {
+                        Text("Select a plugin")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
             } else {
-                Text("Select a plugin")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                StoreView()
             }
         }
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Button(action: manager.testAllUntested) {
-                    Label("Test All", systemImage: "play.circle")
+            ToolbarItem(placement: .navigation) {
+                Picker("", selection: $activeTab) {
+                    Text("Library").tag(AppTab.library)
+                    Text("Browse").tag(AppTab.browse)
                 }
-                .disabled(manager.isScanning)
-                .help("Test all untested plugins")
+                .pickerStyle(.segmented)
+                .frame(width: 160)
+            }
 
-                Button(action: manager.refresh) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+            if activeTab == .library {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    Button(action: manager.testAllUntested) {
+                        Label("Test All", systemImage: "play.circle")
+                    }
+                    .disabled(manager.isScanning)
+                    .help("Test all untested plugins")
+
+                    Button(action: manager.refresh) {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(manager.isScanning)
+                    .help("Rescan for plugins")
                 }
-                .disabled(manager.isScanning)
-                .help("Rescan for plugins")
             }
         }
     }

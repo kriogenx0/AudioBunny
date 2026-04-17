@@ -359,4 +359,18 @@ class PluginManager: ObservableObject {
     func restorePath(for type: PluginType) -> String {
         restoreDestination(for: type).path
     }
+
+    // MARK: - Delete (Uninstall)
+
+    func deletePlugin(_ plugin: AudioPlugin) {
+        Task {
+            let fm = FileManager.default
+            do {
+                try fm.removeItem(at: plugin.fileURL)
+                plugins.removeAll { $0.id == plugin.id }
+            } catch {
+                print("Failed to delete \(plugin.name): \(error)")
+            }
+        }
+    }
 }

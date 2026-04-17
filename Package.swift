@@ -8,6 +8,9 @@ let package = Package(
         .executableTarget(
             name: "AudioBunny",
             path: "Sources/AudioBunny",
+            resources: [
+                .process("PluginCatalog.json")
+            ],
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"])
             ]
