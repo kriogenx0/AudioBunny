@@ -12,34 +12,20 @@ struct ContentView: View {
     @State private var activeTab: AppTab = .library
 
     var body: some View {
-        Group {
-            if activeTab == .library {
-                NavigationSplitView(columnVisibility: .constant(.all)) {
-                    SidebarView(selectedPlugin: $selectedPlugin)
-                } detail: {
-                    if let plugin = selectedPlugin {
-                        PluginDetailView(plugin: plugin)
-                    } else {
-                        Text("Select a plugin")
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
+        TabView(selection: $activeTab) {
+            NavigationSplitView(columnVisibility: .constant(.all)) {
+                SidebarView(selectedPlugin: $selectedPlugin)
+            } detail: {
+                if let plugin = selectedPlugin {
+                    PluginDetailView(plugin: plugin)
+                } else {
+                    Text("Select a plugin")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            } else {
-                StoreView()
             }
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigation) {
-                Picker("", selection: $activeTab) {
-                    Text("Library").tag(AppTab.library)
-                    Text("Browse").tag(AppTab.browse)
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 160)
-            }
-
-            if activeTab == .library {
+            .toolbar(removing: .sidebarToggle)
+            .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button(action: manager.testAllUntested) {
                         Label("Test All", systemImage: "play.circle")
@@ -54,6 +40,12 @@ struct ContentView: View {
                     .help("Rescan for plugins")
                 }
             }
+            .tabItem { Label("Installed Plugins", systemImage: "puzzlepiece") }
+            .tag(AppTab.library)
+
+            StoreView()
+                .tabItem { Label("Browse Plugins", systemImage: "magnifyingglass") }
+                .tag(AppTab.browse)
         }
     }
 }
@@ -70,6 +62,7 @@ struct SidebarView: View {
             StatsBar()
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .frame(maxWidth: .infinity)
                 .background(.bar)
 
             Divider()
