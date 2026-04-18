@@ -1,0 +1,12 @@
+# API
+api/.venv/
+api/__pycache__/
+api/*.db
+api/*.pyc
+api/thumbnails/
+api/downloads/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/

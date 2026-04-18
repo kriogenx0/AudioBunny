@@ -1,0 +1,24 @@
+# AudioBunny API — systemd service unit
+# Install: sudo cp deploy/audiobunny-api.service /etc/systemd/system/
+#          sudo systemctl daemon-reload
+#          sudo systemctl enable --now audiobunny-api
+
+[Unit]
+Description=AudioBunny FastAPI
+After=network.target
+
+[Service]
+User=deploy
+WorkingDirectory=/var/www/audiobunny/current/web/api
+ExecStart=/var/www/audiobunny/venv/bin/uvicorn main:app \
+          --host 127.0.0.1 \
+          --port 8000 \
+          --workers 2
+Restart=on-failure
+RestartSec=5
+
+# Keep the database and uploads outside the release tree
+Environment=HOME=/home/deploy
+
+[Install]
+WantedBy=multi-user.target
