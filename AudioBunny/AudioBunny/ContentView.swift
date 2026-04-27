@@ -53,6 +53,7 @@ struct SidebarView: View {
 
             // Stats bar
             StatsBar()
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(.bar)
@@ -124,12 +125,14 @@ struct StatsBar: View {
 
     @ViewBuilder
     private func statItem(_ count: Int, label: String, color: Color) -> some View {
-        VStack(spacing: 2) {
+        VStack(alignment: .center, spacing: 2) {
             Text("\(count)")
                 .fontWeight(.semibold)
                 .foregroundStyle(color)
+                .frame(maxWidth: .infinity, alignment: .center)
             Text(label)
                 .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 }
@@ -408,3 +411,4 @@ struct PluginDetailView: View {
         }
     }
 }
+
