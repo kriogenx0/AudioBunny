@@ -87,6 +87,7 @@ class AudioPlugin: ObservableObject, Identifiable, Hashable {
     }
 
     var isDisabled: Bool { status == .disabled }
+    var isSystemPlugin: Bool { fileURL.path.hasPrefix("/System/") }
     var canTest: Bool { status != .testing && status != .disabled }
 
     var subtypeString: String? {

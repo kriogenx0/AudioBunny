@@ -130,7 +130,7 @@ class PluginManager: ObservableObject {
 
         return allComponents.map { component in
             let desc = component.audioComponentDescription
-            let fileURL = component.iconURL?.deletingLastPathComponent()
+            let fileURL = component.iconURL.flatMap { componentBundleURL(from: $0) }
                 ?? URL(fileURLWithPath: "/Library/Audio/Plug-Ins/Components/\(component.name).component")
 
             return AudioPlugin(
@@ -141,6 +141,15 @@ class PluginManager: ObservableObject {
                 componentDescription: desc
             )
         }
+    }
+
+    private func componentBundleURL(from iconURL: URL) -> URL? {
+        var url = iconURL
+        while url.path != "/" {
+            if url.pathExtension == "component" { return url }
+            url = url.deletingLastPathComponent()
+        }
+        return nil
     }
 
     // MARK: - VST Discovery

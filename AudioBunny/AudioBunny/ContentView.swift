@@ -102,7 +102,7 @@ struct SidebarView: View {
         }
         .searchable(text: $manager.searchText, prompt: "Search plugins")
         .navigationTitle("AudioBunny")
-        .frame(minWidth: 300)
+        .frame(minWidth: 330)
     }
 }
 
@@ -364,6 +364,10 @@ struct PluginDetailView: View {
                             }
                             .buttonStyle(.bordered)
                             Text("Plugin will be moved back to: \(manager.restorePath(for: plugin.type))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else if plugin.isSystemPlugin {
+                            Text("System plugins cannot be disabled.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         } else {
