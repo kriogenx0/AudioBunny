@@ -8,16 +8,16 @@ interface PluginCardProps {
   plugin: Plugin
 }
 
-const TYPE_EMOJI: Record<string, string> = {
-  'Audio Unit': '🎛️',
-  'VST 2': '🔌',
-  'VST 3': '🎚️',
-}
-
 const TYPE_BADGE: Record<string, string> = {
   'Audio Unit': 'badge-au',
   'VST 2': 'badge-vst2',
   'VST 3': 'badge-vst3',
+}
+
+const TYPE_BG: Record<string, string> = {
+  'Audio Unit': '#3b2fa0',
+  'VST 2': '#7a5a0a',
+  'VST 3': '#0e5c3a',
 }
 
 export default function PluginCard({ plugin }: PluginCardProps) {
@@ -46,13 +46,10 @@ export default function PluginCard({ plugin }: PluginCardProps) {
 
   return (
     <Link to={`/plugin/${plugin.id}`} className="plugin-card">
-      <div className="plugin-card-thumb">
-        {TYPE_EMOJI[plugin.plugin_type] ?? '🎵'}
-      </div>
-
       <div className="plugin-card-body">
-        <div className="plugin-card-header">
-          <div>
+        <div className="plugin-card-top">
+          <PluginIcon plugin={plugin} typeBg={TYPE_BG[plugin.plugin_type] ?? '#2a2a3a'} size={56} />
+          <div className="plugin-card-info">
             <div className="plugin-card-name">{plugin.name}</div>
             <div className="plugin-card-mfr">{plugin.manufacturer}</div>
           </div>
@@ -79,19 +76,37 @@ export default function PluginCard({ plugin }: PluginCardProps) {
         {plugin.description && (
           <p className="plugin-card-desc">{plugin.description}</p>
         )}
-
-        <div className="plugin-card-footer">
-          <span className={`plugin-price ${plugin.is_free ? 'free' : 'paid'}`}>
-            {plugin.is_free ? 'Free' : `$${plugin.price_usd}`}
-          </span>
-          {plugin.version && (
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              v{plugin.version}
-            </span>
-          )}
-        </div>
       </div>
     </Link>
+  )
+}
+
+function PluginIcon({ plugin, typeBg, size }: { plugin: Plugin; typeBg: string; size: number }) {
+  const [imgError, setImgError] = useState(false)
+  const radius = Math.round(size * 0.18)
+  const fontSize = Math.round(size * 0.4)
+
+  if (plugin.thumbnail_url && !imgError) {
+    return (
+      <img
+        className="plugin-icon-img"
+        src={`/api${plugin.thumbnail_url}`}
+        alt={plugin.name}
+        width={size}
+        height={size}
+        style={{ borderRadius: radius }}
+        onError={() => setImgError(true)}
+      />
+    )
+  }
+
+  return (
+    <div
+      className="plugin-icon-fallback"
+      style={{ width: size, height: size, borderRadius: radius, background: typeBg, fontSize }}
+    >
+      {plugin.name.charAt(0).toUpperCase()}
+    </div>
   )
 }
 
@@ -106,3 +121,5 @@ function HeartIcon({ filled }: { filled: boolean }) {
     </svg>
   )
 }
+
+export { PluginIcon }

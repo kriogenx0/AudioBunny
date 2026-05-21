@@ -3,17 +3,18 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getPlugin, addFavorite, removeFavorite } from '../api'
 import { useAuth } from '../context/AuthContext'
 import { useState } from 'react'
-
-const TYPE_EMOJI: Record<string, string> = {
-  'Audio Unit': '🎛️',
-  'VST 2': '🔌',
-  'VST 3': '🎚️',
-}
+import { PluginIcon } from '../components/PluginCard'
 
 const TYPE_BADGE: Record<string, string> = {
   'Audio Unit': 'badge-au',
   'VST 2': 'badge-vst2',
   'VST 3': 'badge-vst3',
+}
+
+const TYPE_BG: Record<string, string> = {
+  'Audio Unit': '#3b2fa0',
+  'VST 2': '#7a5a0a',
+  'VST 3': '#0e5c3a',
 }
 
 export default function PluginDetailPage() {
@@ -73,21 +74,21 @@ export default function PluginDetailPage() {
 
       <div className="detail-layout">
         <div>
-          <div className="detail-thumb">
-            {TYPE_EMOJI[plugin.plugin_type] ?? '🎵'}
-          </div>
-
-          <div className="detail-title">{plugin.name}</div>
-          <div className="detail-mfr">{plugin.manufacturer}</div>
-
-          <div className="detail-badges">
-            <span className={`badge ${TYPE_BADGE[plugin.plugin_type] ?? ''}`}>
-              {plugin.plugin_type}
-            </span>
-            {plugin.is_free
-              ? <span className="badge badge-free">Free</span>
-              : <span className="badge badge-paid">${plugin.price_usd}</span>
-            }
+          <div className="detail-hero">
+            <PluginIcon plugin={plugin} typeBg={TYPE_BG[plugin.plugin_type] ?? '#2a2a3a'} size={96} />
+            <div>
+              <div className="detail-title">{plugin.name}</div>
+              <div className="detail-mfr">{plugin.manufacturer}</div>
+              <div className="detail-badges">
+                <span className={`badge ${TYPE_BADGE[plugin.plugin_type] ?? ''}`}>
+                  {plugin.plugin_type}
+                </span>
+                {plugin.is_free
+                  ? <span className="badge badge-free">Free</span>
+                  : <span className="badge badge-paid">${plugin.price_usd}</span>
+                }
+              </div>
+            </div>
           </div>
 
           {plugin.description && (
