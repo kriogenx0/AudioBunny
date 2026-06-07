@@ -49,6 +49,7 @@ export default function CatalogPage({ search }: Props) {
         <button className={`chip ${freeOnly ? 'active' : ''}`} style={{ marginLeft: 8 }} onClick={() => setFreeOnly(v => !v)}>Free</button>
         <div className="filters-right">
           <span className="results-count">{filtered.length} plugin{filtered.length !== 1 ? 's' : ''}</span>
+          <Link to="/submit-plugin" className="btn btn-primary btn-sm">+ Submit Plugin</Link>
         </div>
       </div>
 

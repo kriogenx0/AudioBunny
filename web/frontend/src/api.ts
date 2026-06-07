@@ -38,6 +38,7 @@ export interface User {
   email: string
   username: string
   created_at: string
+  is_admin: boolean
 }
 
 export interface Preset {
@@ -154,3 +155,44 @@ export const uploadPreset = (formData: FormData) =>
   http.post<Preset>('/presets', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then((r) => r.data)
+
+// ── Plugin submission ──────────────────────────────────────────────────────
+
+export interface PluginSubmission {
+  name: string
+  manufacturer: string
+  category: 'instrument' | 'effect'
+  formats: string[]
+  description?: string
+  version?: string
+  tags?: string
+  website_url?: string
+  github_repo?: string
+  is_free: boolean
+  price_usd?: number | null
+}
+
+export const submitPlugin = (data: PluginSubmission) =>
+  http.post<Plugin>('/plugins', { ...data, formats: data.formats }).then((r) => r.data)
+
+// ── Admin ──────────────────────────────────────────────────────────────────
+
+export interface AdminSubmissions {
+  plugins: (Plugin & { submitted_by: { id: number; username: string } | null })[]
+  presets: (Preset & { uploader_username: string | null })[]
+}
+
+export const getAdminSubmissions = () =>
+  http.get<AdminSubmissions>('/admin/submissions').then((r) => r.data)
+
+export const approvePlugin = (id: number) =>
+  http.patch(`/admin/plugins/${id}`, { status: 'approved' }).then((r) => r.data)
+
+export const rejectPlugin = (id: number) =>
+  http.patch(`/admin/plugins/${id}`, { status: 'rejected' }).then((r) => r.data)
+
+export const approvePreset = (id: number) =>
+  http.patch(`/admin/presets/${id}`, { status: 'approved' }).then((r) => r.data)
+
+export const rejectPreset = (id: number) =>
+  http.patch(`/admin/presets/${id}`, { status: 'rejected' }).then((r) => r.data)

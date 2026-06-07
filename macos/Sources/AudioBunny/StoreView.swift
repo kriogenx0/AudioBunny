@@ -6,6 +6,8 @@ struct StoreView: View {
     @EnvironmentObject var manager: PluginManager
     @EnvironmentObject var catalogManager: CatalogManager
     @EnvironmentObject var downloadManager: DownloadManager
+    @EnvironmentObject var presetManager: PresetManager
+    @State private var showSubmitSheet = false
 
     private let columns = [GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 14)]
 
@@ -20,6 +22,20 @@ struct StoreView: View {
             }
             .navigationTitle("Discover")
             .searchable(text: $catalogManager.searchText, placement: .toolbar, prompt: "Search plugins")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showSubmitSheet = true
+                    } label: {
+                        Label("Submit Plugin", systemImage: "plus.circle")
+                    }
+                    .help("Submit a plugin to the catalog")
+                }
+            }
+            .sheet(isPresented: $showSubmitSheet) {
+                SubmitPluginSheet(isPresented: $showSubmitSheet)
+                    .environmentObject(presetManager)
+            }
         }
     }
 
@@ -487,5 +503,190 @@ func formatIcon(_ format: String) -> (icon: String, color: Color) {
     case "VST2": return ("puzzlepiece",      .purple)
     case "VST3": return ("puzzlepiece.fill", .indigo)
     default:     return ("music.note",       .secondary)
+    }
+}
+
+// MARK: - Submit Plugin Sheet
+
+struct SubmitPluginSheet: View {
+    @Binding var isPresented: Bool
+    @EnvironmentObject var presetManager: PresetManager
+
+    @State private var name = ""
+    @State private var manufacturer = ""
+    @State private var category: PluginCategory = .instrument
+    @State private var formats: Set<String> = ["VST3"]
+    @State private var description = ""
+    @State private var version = ""
+    @State private var websiteURL = ""
+    @State private var githubRepo = ""
+    @State private var tags = ""
+    @State private var isFree = true
+    @State private var priceUsd = ""
+    @State private var isSubmitting = false
+    @State private var error: String? = nil
+    @State private var submitted = false
+
+    private let allFormats = ["AU", "VST2", "VST3"]
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Submit a Plugin")
+                    .font(.title3).fontWeight(.semibold)
+                Spacer()
+                Button { isPresented = false } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3).foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(20)
+
+            Divider()
+
+            if presetManager.currentUser == nil {
+                // Not logged in
+                VStack(spacing: 16) {
+                    Image(systemName: "person.circle")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.secondary)
+                    Text("Sign in to submit plugins")
+                        .font(.headline)
+                    Text("Create a free account to contribute to the AudioBunny plugin catalog.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Sign In / Create Account") {
+                        isPresented = false
+                        // AccountSheet will be shown from PresetsView if needed
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding(40)
+                .frame(maxWidth: .infinity)
+            } else if submitted {
+                VStack(spacing: 16) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48)).foregroundStyle(.green)
+                    Text("Submitted for Review")
+                        .font(.headline)
+                    Text("Your submission will be reviewed and appear in the catalog once approved.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    Button("Done") { isPresented = false }
+                        .buttonStyle(.borderedProminent)
+                }
+                .padding(40)
+                .frame(maxWidth: .infinity)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        row("Plugin Name") {
+                            TextField("e.g. Serum", text: $name).textFieldStyle(.roundedBorder)
+                        }
+                        row("Developer / Manufacturer") {
+                            TextField("e.g. Xfer Records", text: $manufacturer).textFieldStyle(.roundedBorder)
+                        }
+                        row("Category") {
+                            Picker("", selection: $category) {
+                                ForEach(PluginCategory.allCases) { c in
+                                    Label(c.label, systemImage: c.icon).tag(c)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                        row("Formats") {
+                            HStack(spacing: 8) {
+                                ForEach(allFormats, id: \.self) { f in
+                                    Toggle(f, isOn: Binding(
+                                        get: { formats.contains(f) },
+                                        set: { if $0 { formats.insert(f) } else { formats.remove(f) } }
+                                    ))
+                                    .toggleStyle(.checkbox)
+                                }
+                            }
+                        }
+                        row("Description") {
+                            TextEditor(text: $description)
+                                .frame(height: 60)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.3)))
+                        }
+                        HStack(spacing: 14) {
+                            VStack(alignment: .leading) {
+                                Text("Version").font(.caption).foregroundStyle(.secondary)
+                                TextField("e.g. 2.1.0", text: $version).textFieldStyle(.roundedBorder)
+                            }
+                            VStack(alignment: .leading) {
+                                Text("Website URL").font(.caption).foregroundStyle(.secondary)
+                                TextField("https://…", text: $websiteURL).textFieldStyle(.roundedBorder)
+                            }
+                        }
+                        row("GitHub Repo (optional)") {
+                            TextField("owner/repo", text: $githubRepo).textFieldStyle(.roundedBorder)
+                        }
+                        row("Tags (comma-separated)") {
+                            TextField("synth, wavetable, free", text: $tags).textFieldStyle(.roundedBorder)
+                        }
+                        HStack(spacing: 12) {
+                            Toggle("Free plugin", isOn: $isFree).toggleStyle(.checkbox)
+                            if !isFree {
+                                TextField("Price (USD)", text: $priceUsd)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 120)
+                            }
+                        }
+
+                        if let err = error {
+                            Text(err).foregroundStyle(.red).font(.caption)
+                        }
+                    }
+                    .padding(20)
+                }
+
+                Divider()
+
+                HStack {
+                    Button("Cancel") { isPresented = false }.buttonStyle(.bordered)
+                    Spacer()
+                    Button("Submit for Review") {
+                        Task { await submit() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(name.isEmpty || manufacturer.isEmpty || formats.isEmpty || isSubmitting)
+
+                    if isSubmitting { ProgressView().scaleEffect(0.8) }
+                }
+                .padding(16)
+            }
+        }
+        .frame(width: 500, height: presetManager.currentUser == nil || submitted ? 320 : 560)
+    }
+
+    @ViewBuilder
+    private func row<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption).foregroundStyle(.secondary)
+            content()
+        }
+    }
+
+    private func submit() async {
+        isSubmitting = true
+        error = nil
+        do {
+            _ = try await APIClient.submitPlugin(
+                name: name, manufacturer: manufacturer,
+                category: category.rawValue, formats: Array(formats),
+                description: description, version: version,
+                websiteURL: websiteURL, githubRepo: githubRepo,
+                tags: tags, isFree: isFree,
+                priceUsd: isFree ? nil : Double(priceUsd)
+            )
+            submitted = true
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isSubmitting = false
     }
 }

@@ -7,6 +7,13 @@ Rails.application.routes.draw do
 
       get "plugins",     to: "plugins#index"
       get "plugins/:id", to: "plugins#show"
+      post "plugins",    to: "plugins#create"
+
+      namespace :admin do
+        get    "submissions",      to: "submissions#index"
+        patch  "plugins/:id",      to: "submissions#update_plugin"
+        patch  "presets/:id",      to: "submissions#update_preset"
+      end
 
       get   "presets",             to: "presets#index"
       get   "presets/:id",         to: "presets#show"

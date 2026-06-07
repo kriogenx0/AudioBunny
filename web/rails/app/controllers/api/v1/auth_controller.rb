@@ -32,6 +32,7 @@ class Api::V1::AuthController < ApplicationController
   private
 
   def user_json(user)
-    { id: user.id, email: user.email, username: user.username, created_at: user.created_at }
+    { id: user.id, email: user.email, username: user.username,
+      is_admin: user.is_admin?, created_at: user.created_at }
   end
 end

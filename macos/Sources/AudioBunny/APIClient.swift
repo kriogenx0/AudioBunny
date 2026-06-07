@@ -88,7 +88,26 @@ enum APIClient {
         return try await decode(perform: req)
     }
 
-    static func downloadPreset(_ id: Int) async throws -> Data {
+    static func submitPlugin(
+        name: String, manufacturer: String, category: String, formats: [String],
+        description: String, version: String, websiteURL: String, githubRepo: String,
+        tags: String, isFree: Bool, priceUsd: Double?
+    ) async throws -> APIPlugin {
+        var body: [String: String] = [
+            "name": name, "manufacturer": manufacturer,
+            "category": category, "plugin_type": "VST 3",
+            "description": description, "version": version,
+            "website_url": websiteURL, "github_repo": githubRepo,
+            "tags": tags, "is_free": isFree ? "true" : "false",
+        ]
+        if let price = priceUsd { body["price_usd"] = String(price) }
+        // formats needs special handling as array
+        var req = try makeRequest("plugins", method: "POST")
+        var bodyDict: [String: Any] = body.mapValues { $0 as Any }
+        bodyDict["formats"] = formats
+        req.httpBody = try JSONSerialization.data(withJSONObject: bodyDict)
+        return try await decode(perform: req)
+    }
         let req = try makeRequest("presets/\(id)/download")
         let (data, _) = try await URLSession.shared.data(for: req)
         return data

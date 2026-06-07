@@ -54,6 +54,15 @@ export default function Header({ searchValue = '', onSearch }: HeaderProps) {
             Favorites
           </Link>
         )}
+        {user?.is_admin && (
+          <Link
+            to="/admin"
+            className={`nav-link ${location.pathname === '/admin' ? 'active' : ''}`}
+            style={{ color: 'var(--yellow)' }}
+          >
+            Admin
+          </Link>
+        )}
 
         {user ? (
           <>
