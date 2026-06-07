@@ -19,6 +19,7 @@ fastlane/test_output
 
 # Swift Package Manager
 .build/
+*.app/
 
 # Rails
 web/rails/log/*.log

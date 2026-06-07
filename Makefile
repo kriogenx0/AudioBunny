@@ -1,31 +1,38 @@
-MACOS_DIR := macos
-WEB_DIR   := web
-APP_BIN   := $(MACOS_DIR)/.build/debug/AudioBunny
+MACOS_DIR  := macos
+WEB_DIR    := web
+APP_BIN    := $(MACOS_DIR)/.build/debug/AudioBunny
+APP_BUNDLE := $(MACOS_DIR)/.build/debug/AudioBunny.app
 
-.PHONY: dev dev-down macos-build macos-run web-up web-down help
+.PHONY: dev dev-down macos-build macos-bundle macos-run web-up web-down web-logs help
 
-# ── Dev: build macOS app + run web stack in Docker ───────────────────────────
+# ── Default: build + run everything ──────────────────────────────────────────
 
-dev: macos-build web-up
+dev: macos-bundle web-up
 	@echo ""
-	@echo "  macOS app → launching $(APP_BIN)"
-	@echo "  Web app   → http://localhost:5173"
-	@echo "  API       → http://localhost:3000"
+	@echo "  Web app → http://localhost:5173"
+	@echo "  API     → http://localhost:3000"
 	@echo ""
-	@echo "  Ctrl-C or 'make dev-down' to stop Docker."
+	@echo "  'make dev-down' stops Docker."
 	@echo ""
-	$(APP_BIN) &
+	open $(APP_BUNDLE)
 
 dev-down: web-down
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 
 macos-build:
-	@echo "▸ Building macOS app (debug)…"
+	@echo "▸ Building macOS app…"
 	cd $(MACOS_DIR) && swift build -c debug
 
-macos-run: macos-build
-	$(APP_BIN)
+# Wrap the SPM binary in a minimal .app bundle so 'open' works properly
+# (Dock icon, Cmd+Tab, window focus, etc.)
+macos-bundle: macos-build
+	@mkdir -p $(APP_BUNDLE)/Contents/MacOS
+	@cp $(APP_BIN) $(APP_BUNDLE)/Contents/MacOS/AudioBunny
+	@cp $(MACOS_DIR)/Info.plist $(APP_BUNDLE)/Contents/Info.plist
+
+macos-run: macos-bundle
+	open $(APP_BUNDLE)
 
 # ── Web (Docker) ──────────────────────────────────────────────────────────────
 
@@ -44,10 +51,10 @@ web-logs:
 help:
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "  dev           Build macOS app + start web stack in Docker"
+	@echo "  dev           Build macOS app, start web stack in Docker, launch app"
 	@echo "  dev-down      Stop Docker web stack"
-	@echo "  macos-build   Build macOS app (swift build -c debug)"
+	@echo "  macos-build   Compile macOS app (swift build -c debug)"
 	@echo "  macos-run     Build and launch macOS app"
-	@echo "  web-up        Start web stack in Docker (build if needed)"
+	@echo "  web-up        Start web stack in Docker"
 	@echo "  web-down      Stop Docker web stack"
 	@echo "  web-logs      Tail Docker logs"
