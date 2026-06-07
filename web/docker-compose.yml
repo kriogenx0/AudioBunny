@@ -1,4 +1,20 @@
 services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootsecret}
+      MYSQL_DATABASE: audiobunny_development
+      MYSQL_USER: audiobunny
+      MYSQL_PASSWORD: ${DB_PASSWORD:-audiobunny}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "audiobunny", "-p${DB_PASSWORD:-audiobunny}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
   rails:
     build:
       context: .
@@ -7,15 +23,21 @@ services:
       - "3000:3000"
     volumes:
       - ./rails/storage/presets:/app/storage/presets
-      - rails_db:/app/db          # named volume — keeps migrations intact inside image
       - ./rails/log:/app/log
     environment:
       RAILS_ENV: development
       RAILS_LOG_TO_STDOUT: "1"
       JWT_SECRET: ${JWT_SECRET:-audiobunny-dev-secret}
+      DB_HOST: mysql
+      DB_USERNAME: audiobunny
+      DB_PASSWORD: ${DB_PASSWORD:-audiobunny}
+      DB_NAME: audiobunny_development
     command: >
       sh -c "bundle exec rails db:create db:migrate db:seed &&
              bundle exec rails server -b 0.0.0.0 -p 3000"
+    depends_on:
+      mysql:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/plugins"]
       interval: 10s
@@ -35,8 +57,8 @@ services:
       VITE_API_BASE: http://localhost:3000
     command: sh -c "npm install --silent && npm run dev -- --host 0.0.0.0"
     depends_on:
-      - rails   # start after rails container exists; no health gate needed for Vite
+      - rails
 
 volumes:
-  rails_db:
+  mysql_data:
   frontend_node_modules:
