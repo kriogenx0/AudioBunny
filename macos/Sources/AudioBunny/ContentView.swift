@@ -11,10 +11,14 @@ struct ContentView: View {
     @EnvironmentObject var catalogManager: CatalogManager
     @EnvironmentObject var presetManager: PresetManager
     @State private var selectedPlugin: AudioPlugin? = nil
-    @State private var activeTab: AppTab = .library
+    @State private var activeTab: AppTab = .browse
 
     var body: some View {
         TabView(selection: $activeTab) {
+            StoreView()
+                .tabItem { Label("Discover", systemImage: "sparkles") }
+                .tag(AppTab.browse)
+
             NavigationSplitView(columnVisibility: .constant(.all)) {
                 SidebarView(selectedPlugin: $selectedPlugin)
             } detail: {
@@ -42,12 +46,8 @@ struct ContentView: View {
                     .help("Rescan for plugins")
                 }
             }
-            .tabItem { Label("Installed Plugins", systemImage: "puzzlepiece") }
+            .tabItem { Label("My Plugins", systemImage: "puzzlepiece") }
             .tag(AppTab.library)
-
-            StoreView()
-                .tabItem { Label("Browse Plugins", systemImage: "magnifyingglass") }
-                .tag(AppTab.browse)
 
             PresetsView()
                 .tabItem { Label("Presets", systemImage: "music.note.list") }

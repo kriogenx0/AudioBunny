@@ -36,6 +36,7 @@ struct CatalogPlugin: Identifiable, Codable, Hashable {
     let version: String
     let websiteURL: String
     let price: String
+    let thumbnailURL: String?
 
     /// Direct URL to a zip/pkg/dmg download.
     let downloadURL: String?
