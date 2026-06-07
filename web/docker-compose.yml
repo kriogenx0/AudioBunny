@@ -7,18 +7,21 @@ services:
       - "3000:3000"
     volumes:
       - ./rails/storage/presets:/app/storage/presets
-      - ./rails/db:/app/db
+      - rails_db:/app/db          # named volume — keeps migrations intact inside image
       - ./rails/log:/app/log
     environment:
       RAILS_ENV: development
+      RAILS_LOG_TO_STDOUT: "1"
       JWT_SECRET: ${JWT_SECRET:-audiobunny-dev-secret}
     command: >
-      sh -c "bundle exec rails db:create db:migrate db:seed 2>/dev/null; bundle exec rails server -b 0.0.0.0 -p 3000"
+      sh -c "bundle exec rails db:create db:migrate db:seed &&
+             bundle exec rails server -b 0.0.0.0 -p 3000"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/plugins"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 6
+      start_period: 30s
 
   frontend:
     image: node:22-alpine
@@ -32,8 +35,8 @@ services:
       VITE_API_BASE: http://localhost:3000
     command: sh -c "npm install --silent && npm run dev -- --host 0.0.0.0"
     depends_on:
-      rails:
-        condition: service_healthy
+      - rails   # start after rails container exists; no health gate needed for Vite
 
 volumes:
+  rails_db:
   frontend_node_modules:
