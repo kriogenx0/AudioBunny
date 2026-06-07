@@ -18,7 +18,7 @@ enum PluginCategory: String, Codable, CaseIterable, Hashable, Identifiable {
     var icon: String {
         switch self {
         case .instrument: return "pianokeys"
-        case .effect: return "waveform.badge.magnifyingglass"
+        case .effect: return "waveform"
         }
     }
 }
