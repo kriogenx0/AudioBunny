@@ -16,7 +16,7 @@ struct ContentView: View {
     var body: some View {
         TabView(selection: $activeTab) {
             StoreView()
-                .tabItem { Label("Discover", systemImage: "sparkles") }
+                .tabItem { Label("Discover", systemImage: "safari") }
                 .tag(AppTab.browse)
 
             NavigationSplitView(columnVisibility: .constant(.all)) {

@@ -6,7 +6,6 @@ struct StoreView: View {
     @EnvironmentObject var manager: PluginManager
     @EnvironmentObject var catalogManager: CatalogManager
     @EnvironmentObject var downloadManager: DownloadManager
-    @State private var selectedPlugin: CatalogPlugin? = nil
 
     private let columns = [GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 14)]
 
@@ -21,45 +20,40 @@ struct StoreView: View {
             }
             .navigationTitle("Discover")
             .searchable(text: $catalogManager.searchText, placement: .toolbar, prompt: "Search plugins")
-            .sheet(item: $selectedPlugin) { plugin in
-                CatalogPluginSheet(plugin: plugin)
-                    .environmentObject(manager)
-                    .environmentObject(catalogManager)
-                    .environmentObject(downloadManager)
-            }
         }
     }
 
     // MARK: Filter bar
 
     private var filterBar: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Category
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    filterChip("All", icon: "square.grid.2x2", selected: catalogManager.filterCategory == nil) {
-                        catalogManager.filterCategory = nil
-                    }
-                    filterChip("Instruments", icon: PluginCategory.instrument.icon,
-                               selected: catalogManager.filterCategory == .instrument) {
-                        catalogManager.filterCategory = .instrument
-                    }
-                    filterChip("Effects", icon: PluginCategory.effect.icon,
-                               selected: catalogManager.filterCategory == .effect) {
-                        catalogManager.filterCategory = .effect
-                    }
-
-                    Divider().frame(height: 20)
-
-                    filterChip("AU",   icon: formatIcon("AU").icon,   color: formatIcon("AU").color,
-                               selected: catalogManager.filterFormat == "AU")   { catalogManager.filterFormat = catalogManager.filterFormat == "AU"   ? nil : "AU" }
-                    filterChip("VST2", icon: formatIcon("VST2").icon, color: formatIcon("VST2").color,
-                               selected: catalogManager.filterFormat == "VST2") { catalogManager.filterFormat = catalogManager.filterFormat == "VST2" ? nil : "VST2" }
-                    filterChip("VST3", icon: formatIcon("VST3").icon, color: formatIcon("VST3").color,
-                               selected: catalogManager.filterFormat == "VST3") { catalogManager.filterFormat = catalogManager.filterFormat == "VST3" ? nil : "VST3" }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                // Category
+                filterChip("All",         icon: "square.grid.2x2",             selected: catalogManager.filterCategory == nil) {
+                    catalogManager.filterCategory = nil
                 }
-                .padding(.horizontal, 2)
+                filterChip("Instruments", icon: PluginCategory.instrument.icon, selected: catalogManager.filterCategory == .instrument) {
+                    catalogManager.filterCategory = catalogManager.filterCategory == .instrument ? nil : .instrument
+                }
+                filterChip("Effects",     icon: PluginCategory.effect.icon,     selected: catalogManager.filterCategory == .effect) {
+                    catalogManager.filterCategory = catalogManager.filterCategory == .effect ? nil : .effect
+                }
+
+                Divider().frame(height: 20)
+
+                // Format (text-only chips, matching card badges)
+                textChip("AU",   selected: catalogManager.filterFormat == "AU")   { catalogManager.filterFormat = catalogManager.filterFormat == "AU"   ? nil : "AU" }
+                textChip("VST2", selected: catalogManager.filterFormat == "VST2") { catalogManager.filterFormat = catalogManager.filterFormat == "VST2" ? nil : "VST2" }
+                textChip("VST3", selected: catalogManager.filterFormat == "VST3") { catalogManager.filterFormat = catalogManager.filterFormat == "VST3" ? nil : "VST3" }
+
+                Divider().frame(height: 20)
+
+                // Free toggle
+                filterChip("Free", icon: "gift", selected: catalogManager.filterFree) {
+                    catalogManager.filterFree.toggle()
+                }
             }
+            .padding(.horizontal, 2)
         }
     }
 
@@ -81,25 +75,47 @@ struct StoreView: View {
             } else {
                 LazyVGrid(columns: columns, spacing: 14) {
                     ForEach(plugins) { plugin in
-                        PluginDiscoverCard(plugin: plugin)
-                            .onTapGesture { selectedPlugin = plugin }
+                        NavigationLink {
+                            CatalogPluginDetailPage(plugin: plugin)
+                                .environmentObject(manager)
+                                .environmentObject(catalogManager)
+                                .environmentObject(downloadManager)
+                        } label: {
+                            PluginDiscoverCard(plugin: plugin)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
         }
     }
 
-    // MARK: Helpers
+    // MARK: Chip helpers
 
     @ViewBuilder
-    private func filterChip(_ label: String, icon: String, color: Color = .primary,
-                             selected: Bool, action: @escaping () -> Void) -> some View {
+    private func filterChip(_ label: String, icon: String, selected: Bool,
+                             action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(label, systemImage: icon)
                 .font(.caption).fontWeight(.medium)
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(selected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
-                .foregroundStyle(selected ? Color.accentColor : color == .primary ? Color.primary : color)
+                .foregroundStyle(selected ? Color.accentColor : Color.primary)
+                .cornerRadius(7)
+                .overlay(RoundedRectangle(cornerRadius: 7)
+                    .stroke(selected ? Color.accentColor : Color.clear, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func textChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.caption).fontWeight(.medium)
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(selected ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1))
+                .foregroundStyle(selected ? Color.accentColor : Color.primary)
                 .cornerRadius(7)
                 .overlay(RoundedRectangle(cornerRadius: 7)
                     .stroke(selected ? Color.accentColor : Color.clear, lineWidth: 1))
@@ -117,29 +133,25 @@ struct PluginDiscoverCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Art / icon area
-            pluginArt
-                .frame(height: 110)
-                .clipped()
+            pluginArt.frame(height: 110).clipped()
 
-            // Info area
             VStack(alignment: .leading, spacing: 6) {
                 Text(plugin.name)
-                    .font(.headline).lineLimit(1)
+                    .font(.headline).lineLimit(1).foregroundStyle(.primary)
                 Text(plugin.developer)
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
 
                 HStack(spacing: 5) {
                     categoryBadge
-                    ForEach(plugin.formats, id: \.self) { format in
-                        formatBadge(format)
-                    }
+                    ForEach(plugin.formats, id: \.self) { formatBadge($0) }
                     Spacer()
                     priceBadge
                 }
             }
             .padding(12)
+            .frame(height: 72, alignment: .top)  // fixed info area height
         }
+        .frame(height: 182)  // 110 art + 72 info = fixed total
         .background(Color(nsColor: .controlBackgroundColor))
         .cornerRadius(12)
         .overlay(RoundedRectangle(cornerRadius: 12)
@@ -154,273 +166,314 @@ struct PluginDiscoverCard: View {
     private var pluginArt: some View {
         if let urlString = plugin.thumbnailURL, let url = URL(string: urlString) {
             AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let img):
-                    img.resizable().scaledToFill()
-                default:
-                    placeholder
-                }
+                if case .success(let img) = phase { img.resizable().scaledToFill() }
+                else { artPlaceholder }
             }
         } else {
-            placeholder
+            artPlaceholder
         }
     }
 
-    private var placeholder: some View {
+    private var artPlaceholder: some View {
         ZStack {
-            LinearGradient(
-                colors: [placeholderColor.opacity(0.7), placeholderColor],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            LinearGradient(colors: [placeholderColor.opacity(0.7), placeholderColor],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
             VStack(spacing: 6) {
                 Image(systemName: plugin.category.icon)
                     .font(.system(size: 28, weight: .light))
                     .foregroundStyle(.white.opacity(0.9))
                 Text(plugin.name.prefix(1))
                     .font(.system(size: 32, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.white.opacity(0.4))
             }
         }
     }
 
     // MARK: Badges
 
+    // Icon only + tooltip — no text
     private var categoryBadge: some View {
-        Label(plugin.category.label, systemImage: plugin.category.icon)
+        Image(systemName: plugin.category.icon)
             .font(.caption2).fontWeight(.semibold)
             .padding(.horizontal, 6).padding(.vertical, 2)
             .background(categoryColor.opacity(0.15))
             .foregroundStyle(categoryColor)
             .cornerRadius(4)
+            .help(plugin.category.label)
     }
 
+    // Text only — no icon
     @ViewBuilder
     private func formatBadge(_ format: String) -> some View {
-        let f = formatIcon(format)
-        Label(format, systemImage: f.icon)
+        Text(format)
             .font(.caption2).fontWeight(.medium)
             .padding(.horizontal, 5).padding(.vertical, 2)
-            .background(f.color.opacity(0.12))
-            .foregroundStyle(f.color)
+            .background(Color.secondary.opacity(0.1))
+            .foregroundStyle(.secondary)
             .cornerRadius(4)
     }
 
     private var priceBadge: some View {
         Text(plugin.price)
             .font(.caption2).fontWeight(.semibold)
-            .foregroundStyle(plugin.price.lowercased() == "free" ? Color.green : Color.secondary)
+            .foregroundStyle(plugin.isFree ? Color.green : Color.secondary)
     }
 
-    // MARK: Derived colors
-
-    private var categoryColor: Color {
-        plugin.category == .instrument ? .purple : .teal
-    }
+    private var categoryColor: Color { plugin.category == .instrument ? .purple : .teal }
 
     private var placeholderColor: Color {
-        // Deterministic color from plugin name hash
         let colors: [Color] = [.purple, .teal, .blue, .indigo, .pink, .orange, .mint]
-        let idx = abs(plugin.name.hashValue) % colors.count
-        return colors[idx]
+        return colors[abs(plugin.name.hashValue) % colors.count]
     }
 }
 
-// MARK: - Plugin Sheet (detail)
+// MARK: - Full-window Plugin Detail
 
-struct CatalogPluginSheet: View {
+struct CatalogPluginDetailPage: View {
     let plugin: CatalogPlugin
     @EnvironmentObject var manager: PluginManager
     @EnvironmentObject var catalogManager: CatalogManager
     @EnvironmentObject var downloadManager: DownloadManager
-    @Environment(\.dismiss) private var dismiss
 
     private var installedPlugin: AudioPlugin? {
         catalogManager.installedPlugin(for: plugin, in: manager.plugins)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header art
-            ZStack(alignment: .bottomLeading) {
-                PluginDiscoverCard(plugin: plugin)
-                    .frame(height: 140)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Hero art
+                heroArt
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 220)
                     .clipped()
-                    .allowsHitTesting(false)
 
-                HStack(alignment: .bottom) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(plugin.name)
-                            .font(.title2).fontWeight(.bold).foregroundStyle(.white)
-                        Text(plugin.developer)
-                            .font(.subheadline).foregroundStyle(.white.opacity(0.8))
-                    }
-                    .padding(16)
-                    .background(
-                        LinearGradient(colors: [.clear, .black.opacity(0.6)],
-                                       startPoint: .top, endPoint: .bottom)
-                    )
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white.opacity(0.8))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(12)
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .frame(height: 140)
-            .cornerRadius(0)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    // Badges row
-                    HStack(spacing: 6) {
-                        Label(plugin.category.label, systemImage: plugin.category.icon)
-                            .font(.caption).padding(.horizontal, 8).padding(.vertical, 3)
-                            .background((plugin.category == .instrument ? Color.purple : Color.teal).opacity(0.15))
-                            .foregroundStyle(plugin.category == .instrument ? .purple : .teal)
-                            .cornerRadius(6)
-                        ForEach(plugin.formats, id: \.self) { format in
-                            let f = formatIcon(format)
-                            Label(format, systemImage: f.icon)
-                                .font(.caption).padding(.horizontal, 6).padding(.vertical, 3)
-                                .background(f.color.opacity(0.12)).foregroundStyle(f.color)
-                                .cornerRadius(6)
+                VStack(alignment: .leading, spacing: 24) {
+                    // Header row
+                    HStack(alignment: .top, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(plugin.name)
+                                .font(.largeTitle).fontWeight(.bold)
+                            Text(plugin.developer)
+                                .font(.title3).foregroundStyle(.secondary)
+                            badgeRow
                         }
-                        Text(plugin.price)
-                            .font(.caption).fontWeight(.semibold)
-                            .foregroundStyle(plugin.price.lowercased() == "free" ? Color.green : .secondary)
                         Spacer()
+                        installButton
                     }
 
-                    // Description
-                    GroupBox("About") {
+                    Divider()
+
+                    // About
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("About").font(.headline)
                         Text(plugin.description)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(4)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    // Details
-                    GroupBox("Details") {
-                        VStack(spacing: 0) {
-                            infoRow("Developer", plugin.developer)
-                            infoRow("Version",   plugin.version)
-                            infoRow("Formats",   plugin.formats.joined(separator: ", "))
-                            if !plugin.tags.isEmpty {
-                                infoRow("Tags", plugin.tags.joined(separator: ", "))
-                            }
-                        }
-                    }
+                    // Details grid
+                    detailsSection
 
-                    // Actions
-                    GroupBox("Actions") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            actionsContent
-                        }
-                        .padding(4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // Tags
+                    if !plugin.tags.isEmpty {
+                        tagsSection
                     }
                 }
-                .padding(20)
+                .padding(28)
             }
         }
-        .frame(width: 480, height: 580)
+        .navigationTitle(plugin.name)
+        .navigationBarBackButtonHidden(false)
     }
 
-    // MARK: Actions
+    // MARK: Hero
 
     @ViewBuilder
-    private var actionsContent: some View {
+    private var heroArt: some View {
+        if let urlString = plugin.thumbnailURL, let url = URL(string: urlString) {
+            AsyncImage(url: url) { phase in
+                if case .success(let img) = phase { img.resizable().scaledToFill() }
+                else { heroPlaceholder }
+            }
+        } else {
+            heroPlaceholder
+        }
+    }
+
+    private var heroPlaceholder: some View {
+        let color: Color = {
+            let colors: [Color] = [.purple, .teal, .blue, .indigo, .pink, .orange, .mint]
+            return colors[abs(plugin.name.hashValue) % colors.count]
+        }()
+        return ZStack {
+            LinearGradient(colors: [color.opacity(0.5), color],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            Image(systemName: plugin.category.icon)
+                .font(.system(size: 64, weight: .ultraLight))
+                .foregroundStyle(.white.opacity(0.4))
+        }
+    }
+
+    // MARK: Badges row
+
+    private var badgeRow: some View {
+        HStack(spacing: 6) {
+            Label(plugin.category.label, systemImage: plugin.category.icon)
+                .font(.caption).padding(.horizontal, 8).padding(.vertical, 3)
+                .background((plugin.category == .instrument ? Color.purple : Color.teal).opacity(0.15))
+                .foregroundStyle(plugin.category == .instrument ? .purple : .teal)
+                .cornerRadius(6)
+            ForEach(plugin.formats, id: \.self) { format in
+                Text(format)
+                    .font(.caption).fontWeight(.medium)
+                    .padding(.horizontal, 7).padding(.vertical, 3)
+                    .background(Color.secondary.opacity(0.1))
+                    .foregroundStyle(.secondary)
+                    .cornerRadius(6)
+            }
+            Text(plugin.price)
+                .font(.caption).fontWeight(.semibold)
+                .padding(.horizontal, 7).padding(.vertical, 3)
+                .background(plugin.isFree ? Color.green.opacity(0.12) : Color.secondary.opacity(0.08))
+                .foregroundStyle(plugin.isFree ? Color.green : Color.secondary)
+                .cornerRadius(6)
+        }
+    }
+
+    // MARK: Install button
+
+    @ViewBuilder
+    private var installButton: some View {
         if let state = downloadManager.states[plugin.id] {
-            installProgressPanel(state)
-        } else if let installed = installedPlugin {
-            installedPanel(installed)
-        } else if plugin.isDownloadable {
-            downloadablePanel
-        } else {
-            websiteOnlyPanel
-        }
-        Divider()
-        Button { catalogManager.openWebsite(plugin) } label: {
-            Label("Visit Website", systemImage: "safari")
-        }
-        .buttonStyle(.bordered)
-    }
-
-    @ViewBuilder
-    private func installProgressPanel(_ state: InstallState) -> some View {
-        if state.isFailed {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.red)
-                Text(state.label).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
-            }
-            HStack(spacing: 8) {
-                Button("Retry")   { downloadManager.dismissError(for: plugin.id); downloadManager.install(plugin) }.buttonStyle(.borderedProminent)
-                Button("Dismiss") { downloadManager.dismissError(for: plugin.id) }.buttonStyle(.bordered)
-            }
-        } else {
-            VStack(alignment: .leading, spacing: 6) {
-                ProgressView(value: state.progressFraction) {
-                    Text(state.label).font(.caption).foregroundStyle(.secondary)
+            if state.isFailed {
+                Button("Retry") {
+                    downloadManager.dismissError(for: plugin.id)
+                    downloadManager.install(plugin)
                 }
-                .progressViewStyle(.linear)
-                Button("Cancel") { downloadManager.cancel(plugin.id) }.buttonStyle(.bordered).tint(.orange)
+                .buttonStyle(.borderedProminent).tint(.red)
+            } else {
+                VStack(alignment: .trailing, spacing: 4) {
+                    ProgressView(value: state.progressFraction)
+                        .frame(width: 140)
+                    Text(state.label).font(.caption).foregroundStyle(.secondary)
+                    Button("Cancel") { downloadManager.cancel(plugin.id) }
+                        .buttonStyle(.bordered).tint(.orange).font(.caption)
+                }
+            }
+        } else if installedPlugin != nil {
+            Label("Installed", systemImage: "checkmark.circle.fill")
+                .font(.callout).foregroundStyle(.green)
+        } else if plugin.isDownloadable {
+            Button {
+                downloadManager.install(plugin)
+            } label: {
+                Label("Install", systemImage: "arrow.down.circle.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        } else {
+            Button {
+                catalogManager.openWebsite(plugin)
+            } label: {
+                Label("Get Plugin", systemImage: "arrow.up.right.square")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+        }
+    }
+
+    // MARK: Details grid
+
+    private var detailsSection: some View {
+        GroupBox("Details") {
+            VStack(spacing: 0) {
+                detailRow("Developer", plugin.developer)
+                detailRow("Version",   plugin.version)
+                detailRow("Category",  plugin.category.label)
+                detailRow("Formats",   plugin.formats.joined(separator: ", "))
+                detailRow("Price",     plugin.price)
             }
         }
     }
 
     @ViewBuilder
-    private func installedPanel(_ installed: AudioPlugin) -> some View {
-        HStack {
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-            Text("Installed — \(installed.type.rawValue)").foregroundStyle(.secondary)
-        }
-        Divider()
-        Button(role: .destructive) { manager.deletePlugin(installed) } label: {
-            Label("Uninstall Plugin", systemImage: "trash")
-        }
-        .buttonStyle(.bordered)
-        Text("Permanently removes the plugin file from your system.")
-            .font(.caption).foregroundStyle(.secondary)
-    }
-
-    @ViewBuilder
-    private var downloadablePanel: some View {
-        Button { downloadManager.install(plugin) } label: {
-            Label("Install", systemImage: "arrow.down.circle.fill")
-        }
-        .buttonStyle(.borderedProminent)
-        Text(plugin.githubRepo != nil
-             ? "Fetches the latest release from GitHub and installs automatically."
-             : "Downloads and installs the plugin automatically.")
-            .font(.caption).foregroundStyle(.secondary)
-    }
-
-    @ViewBuilder
-    private var websiteOnlyPanel: some View {
-        Button { catalogManager.openWebsite(plugin) } label: {
-            Label("Get Plugin", systemImage: "arrow.up.right.square")
-        }
-        .buttonStyle(.borderedProminent)
-        Text("Opens the developer's website to download and install manually.")
-            .font(.caption).foregroundStyle(.secondary)
-    }
-
-    @ViewBuilder
-    private func infoRow(_ label: String, _ value: String) -> some View {
+    private func detailRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top) {
-            Text(label).foregroundStyle(.secondary).frame(width: 100, alignment: .leading)
-            Text(value).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
+            Text(label)
+                .foregroundStyle(.secondary)
+                .frame(width: 100, alignment: .leading)
+            Text(value)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, 6).padding(.horizontal, 8)
+        .padding(.vertical, 7).padding(.horizontal, 8)
         Divider()
+    }
+
+    // MARK: Tags
+
+    private var tagsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Tags").font(.headline)
+            FlowLayout(spacing: 6) {
+                ForEach(plugin.tags, id: \.self) { tag in
+                    Text(tag)
+                        .font(.caption)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Color.secondary.opacity(0.1))
+                        .foregroundStyle(.secondary)
+                        .cornerRadius(5)
+                }
+            }
+        }
     }
 }
 
-// MARK: - Shared format icon helper
+// MARK: - Simple flow layout for tags
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        let height = rows.map { $0.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0 }
+                         .reduce(0) { $0 + $1 + spacing } - spacing
+        return CGSize(width: proposal.width ?? 0, height: max(height, 0))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in computeRows(proposal: proposal, subviews: subviews) {
+            let rowHeight = row.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+            var x = bounds.minX
+            for subview in row {
+                let size = subview.sizeThatFits(.unspecified)
+                subview.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += rowHeight + spacing
+        }
+    }
+
+    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [[LayoutSubview]] {
+        var rows: [[LayoutSubview]] = [[]]
+        var x: CGFloat = 0
+        let maxWidth = proposal.width ?? .infinity
+        for subview in subviews {
+            let w = subview.sizeThatFits(.unspecified).width
+            if x + w > maxWidth && !rows[rows.count - 1].isEmpty {
+                rows.append([])
+                x = 0
+            }
+            rows[rows.count - 1].append(subview)
+            x += w + spacing
+        }
+        return rows
+    }
+}
+
+// MARK: - Format icon helper (kept for any other usage)
 
 func formatIcon(_ format: String) -> (icon: String, color: Color) {
     switch format {

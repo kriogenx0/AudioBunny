@@ -38,7 +38,7 @@ export default function Header({ searchValue = '', onSearch }: HeaderProps) {
           to="/"
           className={`nav-link ${location.pathname === '/' ? 'active' : ''}`}
         >
-          Browse
+          Discover
         </Link>
         <Link
           to="/presets"

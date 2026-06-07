@@ -22,11 +22,15 @@ export interface Plugin {
   tags: string | null
   thumbnail_url: string | null
   download_url: string | null
+  website_url: string | null
+  github_repo: string | null
   file_size_bytes: number | null
   is_free: boolean
   price_usd: number | null
   created_at: string
   favorited: boolean
+  category: 'instrument' | 'effect' | null
+  formats: string[]   // ["AU", "VST3"]
 }
 
 export interface User {

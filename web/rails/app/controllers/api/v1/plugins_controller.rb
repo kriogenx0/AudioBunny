@@ -29,6 +29,10 @@ class Api::V1::PluginsController < ApplicationController
   private
 
   def plugin_json(plugin, favorited = false)
-    plugin.attributes.merge("favorited" => !!favorited)
+    plugin.attributes.merge(
+      "favorited" => !!favorited,
+      "formats"   => plugin.formats.to_s.split(",").map(&:strip).reject(&:empty?),
+      "category"  => plugin.category.presence || "instrument"
+    )
   end
 end

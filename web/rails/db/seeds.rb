@@ -1,42 +1,95 @@
 PLUGINS = [
-  # ── Synths ──────────────────────────────────────────────────────────────
-  { name: "Serum",         manufacturer: "Xfer Records",         plugin_type: "VST 3",
+  # ── Free plugins (from macOS bundled catalog) ────────────────────────────
+  { name: "Vital",           manufacturer: "Matt Tytel",         category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Spectral warping wavetable synthesizer with a powerful modulation system, 3 oscillators, and detailed visual feedback.",
+    version: "1.5.5", tags: "synth,wavetable,polyphonic", website_url: "https://vital.audio", github_repo: nil },
+  { name: "Surge XT",        manufacturer: "Surge Synth Team",  category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Open-source hybrid synthesizer with extensive modulation capabilities, 300+ factory patches, and multiple synthesis types.",
+    version: "1.3.4", tags: "synth,hybrid,open-source", website_url: "https://surge-synthesizer.github.io", github_repo: "surge-synthesizer/surge" },
+  { name: "Dexed",           manufacturer: "Digital Suburban",  category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "FM synthesizer modeled after the Yamaha DX7, fully compatible with original DX7 SysEx patch banks.",
+    version: "0.9.6", tags: "FM,synth,vintage,open-source", website_url: "https://asb2m10.github.io/dexed/", github_repo: "asb2m10/dexed" },
+  { name: "Odin 2",          manufacturer: "TheWaveWarden",     category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Semi-modular synthesizer with 3 oscillators offering wavetable, FM, PM, and PM-FM synthesis plus a flexible modulation matrix.",
+    version: "2.3.4", tags: "synth,semi-modular,wavetable,open-source", website_url: "https://www.thewavewarden.com/odin2", github_repo: "TheWaveWarden/odin2" },
+  { name: "OB-Xd",           manufacturer: "discoDSP",          category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Virtual analog synthesizer modeled after the Oberheim OB-X with 4-voice polyphony and classic warm analog sound.",
+    version: "2.8", tags: "synth,analog,vintage,Oberheim", website_url: "https://www.discodsp.com/obxd/", github_repo: nil },
+  { name: "TAL-NoiseMaker",  manufacturer: "Togu Audio Line",   category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Virtual analog synthesizer with 3 oscillators, 2 filters, built-in arpeggiator, and stereo chorus for classic electronic tones.",
+    version: "4.0", tags: "synth,analog,arpeggiator", website_url: "https://tal-software.com/products/tal-noisemaker", github_repo: nil },
+  { name: "Helm",            manufacturer: "Matt Tytel",         category: "instrument", formats: "AU,VST2,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Polyphonic synthesizer with multiple oscillator types, flexible routing, and a built-in effects rack.",
+    version: "0.9.0", tags: "synth,polyphonic,open-source", website_url: "https://tytel.org/helm/", github_repo: "mtytel/helm" },
+  { name: "TDR Nova",        manufacturer: "Tokyo Dawn Labs",    category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Parallel dynamic equalizer combining classic parametric EQ with transparent multiband dynamics — ideal for mixing and mastering.",
+    version: "2.2.4", tags: "EQ,dynamics,mastering", website_url: "https://www.tokyodawn.net/tdr-nova/", github_repo: nil },
+  { name: "TAL-Reverb-4",    manufacturer: "Togu Audio Line",   category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "High quality plate reverb with a beautiful vintage character, simple controls, and lush long tails.",
+    version: "1.5", tags: "reverb,plate,vintage", website_url: "https://tal-software.com/products/tal-reverb", github_repo: nil },
+  { name: "SPAN",            manufacturer: "Voxengo",            category: "effect",     formats: "AU,VST2,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Real-time FFT audio spectrum analyzer with adjustable display range, resolution, and multiple display modes.",
+    version: "3.18", tags: "analyzer,spectrum,metering", website_url: "https://www.voxengo.com/product/span/", github_repo: nil },
+  { name: "Limiter No6",     manufacturer: "Vladimir Nadezhdin", category: "effect",    formats: "VST2,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Multi-stage limiter with RMS compressor, high-frequency limiter, clipper, and true peak limiter.",
+    version: "1.2", tags: "limiter,mastering,dynamics,compressor", website_url: "https://vladg.net/plugin/limiter-no6", github_repo: nil },
+  { name: "Ozone Imager 2",  manufacturer: "iZotope",            category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Stereo imaging plugin for widening or narrowing the stereo field with Lissajous metering.",
+    version: "2.00", tags: "stereo,imaging,mastering", website_url: "https://www.izotope.com/en/products/ozone-imager.html", github_repo: nil },
+  { name: "DragonflyReverb", manufacturer: "Michael Willis",     category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Open-source collection of four reverb types — room, hall, early reflections, and plate.",
+    version: "3.2.10", tags: "reverb,open-source,room,hall", website_url: "https://github.com/michaelwillis/dragonfly-reverb", github_repo: "michaelwillis/dragonfly-reverb" },
+  { name: "MFreeFXBundle",   manufacturer: "MeldaProduction",   category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Collection of 37 free audio plugins covering EQ, dynamics, modulation, analysis, and more.",
+    version: "16.12", tags: "bundle,EQ,dynamics,modulation", website_url: "https://www.meldaproduction.com/MFreeFXBundle", github_repo: nil },
+  { name: "TAL-Chorus-LX",  manufacturer: "Togu Audio Line",   category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: true,  price_usd: nil,
+    description: "Emulation of the Roland Juno-60 chorus effect — adds the iconic lush, warm stereo spread to any signal.",
+    version: "2.1", tags: "chorus,vintage,Roland,stereo", website_url: "https://tal-software.com/products/tal-chorus-lx", github_repo: nil },
+
+  # ── Paid plugins ─────────────────────────────────────────────────────────
+  { name: "Serum",           manufacturer: "Xfer Records",       category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: false, price_usd: 189.00,
     description: "The most popular wavetable synthesizer. Drag-and-drop wavetable editing with a visual workflow.",
-    version: "1.36", tags: "synth,wavetable,lead,bass", is_free: false, price_usd: 189.00 },
-  { name: "Guitar Rig 7",  manufacturer: "Native Instruments",   plugin_type: "VST 3",
+    version: "1.36", tags: "synth,wavetable,lead,bass", website_url: "https://xferrecords.com/products/serum", github_repo: nil },
+  { name: "Guitar Rig 7",   manufacturer: "Native Instruments", category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: false, price_usd: 299.00,
     description: "The ultimate amp and effects rack. 17 guitar amps, 27 cabinets, and 54 effects in one plugin.",
-    version: "7.1.0", tags: "guitar,amp,effects,NI", is_free: false, price_usd: 299.00 },
-  { name: "Massive X",     manufacturer: "Native Instruments",   plugin_type: "VST 3",
+    version: "7.1.0", tags: "guitar,amp,effects,NI", website_url: "https://www.native-instruments.com/en/products/komplete/guitar/guitar-rig-7-pro/", github_repo: nil },
+  { name: "Massive X",      manufacturer: "Native Instruments", category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: false, price_usd: 149.00,
     description: "Next evolution of Massive. Phase modulation, formant filters, and dual oscillator routing.",
-    version: "1.5.3", tags: "synth,wavetable,massive,NI", is_free: false, price_usd: 149.00 },
-  { name: "Vital",         manufacturer: "Matt Tytel",           plugin_type: "VST 3",
-    description: "Spectral warping wavetable synth. Free tier with 25 presets. Smooth modulation system.",
-    version: "1.0.8", tags: "synth,wavetable,free,spectral", is_free: true },
-  { name: "Surge XT",      manufacturer: "Surge Synth Team",     plugin_type: "VST 3",
-    description: "Open-source hybrid synthesizer with subtractive, FM, and wavetable synthesis.",
-    version: "1.3.4", tags: "synth,free,open-source,hybrid", is_free: true },
-  { name: "Phase Plant",   manufacturer: "Kilohearts",           plugin_type: "VST 3",
-    description: "Modular semi-modular synth. Mix and match synthesis in a single instrument.",
-    version: "2.1.1", tags: "synth,modular", is_free: false, price_usd: 99.00 },
-  { name: "ES2",           manufacturer: "Apple",                plugin_type: "Audio Unit",
-    description: "Hybrid digital synthesizer bundled with Logic Pro.",
-    version: "2.0", tags: "synth,hybrid,bundled,Logic", is_free: true },
-  # ── Effects ─────────────────────────────────────────────────────────────
-  { name: "FabFilter Pro-Q 3", manufacturer: "FabFilter",        plugin_type: "VST 3",
-    description: "Professional mastering EQ with dynamic EQ modes and linear phase.",
-    version: "3.22", tags: "eq,mastering,dynamics", is_free: false, price_usd: 179.00 },
-  { name: "Valhalla VintageVerb", manufacturer: "Valhalla DSP",  plugin_type: "VST 3",
-    description: "Classic hardware reverb algorithms from the 1970s–1980s. 17 algorithms.",
-    version: "3.0.3", tags: "reverb,vintage,hardware-emulation", is_free: false, price_usd: 50.00 },
-  { name: "Valhalla Supermassive", manufacturer: "Valhalla DSP", plugin_type: "VST 3",
-    description: "Free reverb and delay effect for massive reverbs and echo effects.",
-    version: "3.0.0", tags: "reverb,delay,free", is_free: true },
-  { name: "OTT",           manufacturer: "Xfer Records",         plugin_type: "VST 3",
-    description: "Free multiband upward/downward compressor — go-to for EDM sound design.",
-    version: "1.31", tags: "compressor,multiband,free,EDM", is_free: true },
-  { name: "Kontakt 7",     manufacturer: "Native Instruments",   plugin_type: "Audio Unit",
+    version: "1.5.3", tags: "synth,wavetable,massive,NI", website_url: "https://www.native-instruments.com/en/products/komplete/synths/massive-x/", github_repo: nil },
+  { name: "FabFilter Pro-Q 3", manufacturer: "FabFilter",       category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: false, price_usd: 179.00,
+    description: "Professional mastering EQ with dynamic EQ modes, linear phase, and a natural phase mode.",
+    version: "3.22", tags: "eq,mastering,dynamics", website_url: "https://www.fabfilter.com/products/pro-q-3-equalizer-plug-in", github_repo: nil },
+  { name: "Valhalla VintageVerb", manufacturer: "Valhalla DSP", category: "effect",     formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: false, price_usd: 50.00,
+    description: "Classic hardware reverb algorithms from the 1970s–1980s. 17 algorithms, minimal CPU.",
+    version: "3.0.3", tags: "reverb,vintage,hardware-emulation", website_url: "https://valhalladsp.com/shop/reverb/valhalla-vintage-verb/", github_repo: nil },
+  { name: "Phase Plant",    manufacturer: "Kilohearts",          category: "instrument", formats: "AU,VST3",
+    plugin_type: "VST 3",    is_free: false, price_usd: 99.00,
+    description: "Modular semi-modular synth. Mix and match synthesis techniques in a single instrument.",
+    version: "2.1.1", tags: "synth,modular,semi-modular", website_url: "https://kilohearts.com/products/phase_plant", github_repo: nil },
+  { name: "Kontakt 7",      manufacturer: "Native Instruments", category: "instrument", formats: "AU,VST3",
+    plugin_type: "Audio Unit", is_free: false, price_usd: 399.00,
     description: "The industry-standard sampler. 65 GB library, hundreds of third-party instruments.",
-    version: "7.10", tags: "sampler,NI,orchestral", is_free: false, price_usd: 399.00 },
+    version: "7.10", tags: "sampler,NI,orchestral,industry-standard", website_url: "https://www.native-instruments.com/en/products/komplete/samplers/kontakt-7/", github_repo: nil },
 ].freeze
 
 SERUM_PRESETS = [
@@ -95,27 +148,27 @@ GUITAR_RIG_PRESETS = [
     description: "Extreme gain Rectifier-style tone. Crushing palm mutes, razor-sharp leads.",
     tags: "death-metal,extreme,rectifier,palm-mute", file_extension: "ngrr" },
   { name: "Blues Sustain",     author: "AudioBunny", genre: "Blues",
-    description: "Medium overdrive with a natural compression that makes leads sing with sustain.",
+    description: "Medium overdrive with natural compression that makes leads sing with sustain.",
     tags: "blues,sustain,overdrive,natural", file_extension: "ngrr" },
 ].freeze
 
 puts "Seeding plugins..."
 Plugin.destroy_all
+Preset.destroy_all
 
-plugin_records = PLUGINS.each_with_object({}) do |attrs, h|
+plugin_records = {}
+PLUGINS.each do |attrs|
   p = Plugin.create!(attrs)
-  h[p.name] = p
+  plugin_records[p.name] = p
 end
 puts "  #{Plugin.count} plugins created."
 
 puts "Seeding presets..."
-Preset.destroy_all
+serum      = plugin_records["Serum"]
+guitar_rig = plugin_records["Guitar Rig 7"]
 
-serum       = plugin_records["Serum"]
-guitar_rig  = plugin_records["Guitar Rig 7"]
-
-SERUM_PRESETS.each       { |p| Preset.create!(p.merge(plugin: serum)) }
-GUITAR_RIG_PRESETS.each  { |p| Preset.create!(p.merge(plugin: guitar_rig)) }
+SERUM_PRESETS.each      { |p| Preset.create!(p.merge(plugin: serum)) }      if serum
+GUITAR_RIG_PRESETS.each { |p| Preset.create!(p.merge(plugin: guitar_rig)) } if guitar_rig
 puts "  #{Preset.count} presets created."
 
 puts "Done."

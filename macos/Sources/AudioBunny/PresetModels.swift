@@ -29,15 +29,25 @@ struct APIPlugin: Decodable, Identifiable {
     let description: String?
     let version: String?
     let tags: String?
+    let thumbnailUrl: String?
+    let downloadUrl: String?
+    let websiteUrl: String?
+    let githubRepo: String?
     let isFree: Bool
     let priceUsd: Double?
     let favorited: Bool
+    let category: String?        // "instrument" | "effect"
+    let formats: [String]?       // ["AU", "VST3"]
 
     enum CodingKeys: String, CodingKey {
-        case id, name, manufacturer, description, version, tags, favorited
-        case pluginType = "plugin_type"
-        case isFree     = "is_free"
-        case priceUsd   = "price_usd"
+        case id, name, manufacturer, description, version, tags, favorited, category, formats
+        case pluginType   = "plugin_type"
+        case thumbnailUrl = "thumbnail_url"
+        case downloadUrl  = "download_url"
+        case websiteUrl   = "website_url"
+        case githubRepo   = "github_repo"
+        case isFree       = "is_free"
+        case priceUsd     = "price_usd"
     }
 }
 

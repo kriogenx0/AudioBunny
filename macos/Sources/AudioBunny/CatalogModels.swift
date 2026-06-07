@@ -45,6 +45,7 @@ struct CatalogPlugin: Identifiable, Codable, Hashable {
 
     /// True when an automated install path exists.
     var isDownloadable: Bool { downloadURL != nil || githubRepo != nil }
+    var isFree: Bool { price.lowercased().contains("free") }
 }
 
 // MARK: - Catalog Response
