@@ -22,6 +22,7 @@ dev-down: web-down
 
 macos-build:
 	@echo "▸ Building macOS app…"
+	@rm -rf $(APP_BUNDLE)
 	cd $(MACOS_DIR) && swift build -c debug
 
 # Wrap the SPM binary in a minimal .app bundle so 'open' works properly
