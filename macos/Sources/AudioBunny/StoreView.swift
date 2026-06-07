@@ -73,7 +73,7 @@ struct StoreView: View {
                 }
                 .frame(maxWidth: .infinity, minHeight: 200)
             } else {
-                LazyVGrid(columns: columns, spacing: 14) {
+        LazyVGrid(columns: columns, spacing: 14) {
                     ForEach(plugins) { plugin in
                         NavigationLink {
                             CatalogPluginDetailPage(plugin: plugin)
@@ -133,31 +133,37 @@ struct PluginDiscoverCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            pluginArt.frame(height: 110).clipped()
+            // Art — fixed 110 pt, hard-clipped
+            pluginArt
+                .frame(height: 110)
+                .clipped()
 
-            VStack(alignment: .leading, spacing: 6) {
+            // Info — fixed 72 pt, overflow is hidden
+            VStack(alignment: .leading, spacing: 5) {
                 Text(plugin.name)
                     .font(.headline).lineLimit(1).foregroundStyle(.primary)
                 Text(plugin.developer)
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-
                 HStack(spacing: 5) {
                     categoryBadge
-                    ForEach(plugin.formats, id: \.self) { formatBadge($0) }
-                    Spacer()
+                    ForEach(plugin.formats.prefix(3), id: \.self) { formatBadge($0) }
+                    Spacer(minLength: 0)
                     priceBadge
                 }
             }
-            .padding(12)
-            .frame(height: 72, alignment: .top)  // fixed info area height
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(height: 72, alignment: .top)
+            .clipped()
         }
-        .frame(height: 182)  // 110 art + 72 info = fixed total
+        // Hard 182 pt outer frame — nothing escapes this
+        .frame(height: 182, alignment: .top)
         .background(Color(nsColor: .controlBackgroundColor))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12)
             .stroke(Color(nsColor: .separatorColor), lineWidth: 1))
         .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
-        .contentShape(Rectangle())
+        .contentShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: Art
