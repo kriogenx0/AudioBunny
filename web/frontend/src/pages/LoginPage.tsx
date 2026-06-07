@@ -16,8 +16,8 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const token = await login(username, password)
-      setToken(token.access_token)
+      const { token } = await login(username, password)
+      setToken(token)
       navigate('/')
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? 'Login failed. Please try again.')

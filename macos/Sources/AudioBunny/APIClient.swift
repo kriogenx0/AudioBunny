@@ -1,0 +1,195 @@
+import Foundation
+
+// MARK: - Configuration
+
+enum APIClient {
+    static var baseURL: String {
+        UserDefaults.standard.string(forKey: "apiBaseURL") ?? "http://localhost:3000/api/v1"
+    }
+
+    private static var token: String? {
+        get { UserDefaults.standard.string(forKey: "audiobunny.jwt") }
+        set { UserDefaults.standard.setValue(newValue, forKey: "audiobunny.jwt") }
+    }
+
+    static func clearToken() { token = nil }
+
+    // MARK: - Auth
+
+    static func register(username: String, email: String, password: String) async throws -> AuthResponse {
+        try await post("auth/register", body: [
+            "username": username, "email": email, "password": password
+        ])
+    }
+
+    static func login(login: String, password: String) async throws -> AuthResponse {
+        let response: AuthResponse = try await post("auth/login", body: [
+            "login": login, "password": password
+        ])
+        token = response.token
+        return response
+    }
+
+    static func me() async throws -> APIUser {
+        try await get("auth/me")
+    }
+
+    // MARK: - Plugins
+
+    static func listPlugins(q: String? = nil) async throws -> [APIPlugin] {
+        var params: [String: String] = [:]
+        if let q { params["q"] = q }
+        return try await get("plugins", params: params)
+    }
+
+    // MARK: - Presets
+
+    static func listPresets(pluginId: Int? = nil, genre: String? = nil, q: String? = nil, community: Bool? = nil) async throws -> [APIPreset] {
+        var params: [String: String] = [:]
+        if let pluginId  { params["plugin_id"] = String(pluginId) }
+        if let genre     { params["genre"] = genre }
+        if let q         { params["q"] = q }
+        if let community { params["community"] = community ? "true" : "false" }
+        return try await get("presets", params: params)
+    }
+
+    static func getPreset(_ id: Int) async throws -> APIPreset {
+        try await get("presets/\(id)")
+    }
+
+    static func uploadPreset(pluginId: Int, name: String, author: String, genre: String, description: String, tags: [String], fileURL: URL, fileExtension: String) async throws -> APIPreset {
+        let boundary = "Boundary-\(UUID().uuidString)"
+        var body = Data()
+
+        func append(_ name: String, _ value: String) {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+
+        append("plugin_id",   String(pluginId))
+        append("name",        name)
+        append("author",      author)
+        append("genre",       genre)
+        append("description", description)
+        append("tags",        tags.joined(separator: ","))
+
+        let fileData = try Data(contentsOf: fileURL)
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        var req = try makeRequest("presets", method: "POST")
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return try await decode(perform: req)
+    }
+
+    static func downloadPreset(_ id: Int) async throws -> Data {
+        let req = try makeRequest("presets/\(id)/download")
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return data
+    }
+
+    // MARK: - Preset favorites
+
+    static func favoritePreset(_ id: Int) async throws {
+        let _: OkResponse = try await post("favorites/presets/\(id)", body: [:])
+    }
+
+    static func unfavoritePreset(_ id: Int) async throws {
+        let _: OkResponse = try await delete("favorites/presets/\(id)")
+    }
+
+    static func favoritedPresets() async throws -> [APIPreset] {
+        try await get("favorites/presets")
+    }
+
+    // MARK: - Preset installs
+
+    /// macOS direct install: status = completed
+    static func markInstalled(_ id: Int) async throws {
+        let _: APIInstall = try await post("installs/presets/\(id)", body: ["status": "completed"])
+    }
+
+    /// Web-queued installs waiting for the macOS app
+    static func queuedInstalls() async throws -> [APIInstall] {
+        try await get("installs/presets", params: ["status": "queued"])
+    }
+
+    /// macOS app marks a queued install as done
+    static func completeInstall(_ id: Int) async throws {
+        let _: APIInstall = try await patch("installs/presets/\(id)", body: ["status": "completed"])
+    }
+
+    // MARK: - Generics
+
+    private static func get<T: Decodable>(_ path: String, params: [String: String] = [:]) async throws -> T {
+        var req = try makeRequest(path, params: params)
+        req.httpMethod = "GET"
+        return try await decode(perform: req)
+    }
+
+    private static func post<T: Decodable>(_ path: String, body: [String: String]) async throws -> T {
+        var req = try makeRequest(path, method: "POST")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await decode(perform: req)
+    }
+
+    private static func patch<T: Decodable>(_ path: String, body: [String: String]) async throws -> T {
+        var req = try makeRequest(path, method: "PATCH")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return try await decode(perform: req)
+    }
+
+    private static func delete<T: Decodable>(_ path: String) async throws -> T {
+        let req = try makeRequest(path, method: "DELETE")
+        return try await decode(perform: req)
+    }
+
+    private static func makeRequest(_ path: String, method: String = "GET", params: [String: String] = [:]) throws -> URLRequest {
+        guard var components = URLComponents(string: "\(baseURL)/\(path)") else {
+            throw APIError.invalidURL
+        }
+        if !params.isEmpty {
+            components.queryItems = params.map { URLQueryItem(name: $0.key, value: $0.value) }
+        }
+        guard let url = components.url else { throw APIError.invalidURL }
+        var req = URLRequest(url: url)
+        req.httpMethod = method
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let t = token { req.setValue("Bearer \(t)", forHTTPHeaderField: "Authorization") }
+        return req
+    }
+
+    private static func decode<T: Decodable>(perform req: URLRequest) async throws -> T {
+        let (data, response) = try await URLSession.shared.data(for: req)
+        if let http = response as? HTTPURLResponse, http.statusCode >= 400 {
+            let msg = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.error ?? "HTTP \(http.statusCode)"
+            throw APIError.serverError(msg)
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(T.self, from: data)
+    }
+}
+
+// MARK: - Errors
+
+enum APIError: LocalizedError {
+    case invalidURL
+    case serverError(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL:           return "Invalid API URL"
+        case .serverError(let m):   return m
+        }
+    }
+}
+
+private struct APIErrorBody: Decodable { let error: String }
+private struct OkResponse: Decodable { let ok: Bool }

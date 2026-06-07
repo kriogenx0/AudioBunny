@@ -130,7 +130,7 @@ final class DownloadManager: ObservableObject {
             case .failure(let err): return fail(plugin.id, err.localizedDescription)
             }
         } else {
-            return fail(plugin.id, DownloadError.noDownloadSource.localizedDescription!)
+            return fail(plugin.id, DownloadError.noDownloadSource.localizedDescription)
         }
 
         states[plugin.id] = InstallState(phase: .downloading(progress: 0))

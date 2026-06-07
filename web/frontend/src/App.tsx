@@ -3,6 +3,8 @@ import { useState } from 'react'
 import Header from './components/Header'
 import CatalogPage from './pages/CatalogPage'
 import PluginDetailPage from './pages/PluginDetailPage'
+import PresetsPage from './pages/PresetsPage'
+import PresetDetailPage from './pages/PresetDetailPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import FavoritesPage from './pages/FavoritesPage'
@@ -24,6 +26,8 @@ export default function App() {
       <Routes>
         <Route path="/" element={<CatalogPage search={search} />} />
         <Route path="/plugin/:id" element={<PluginDetailPage />} />
+        <Route path="/presets" element={<PresetsPage />} />
+        <Route path="/presets/:id" element={<PresetDetailPage />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
         <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterPage />} />
         <Route

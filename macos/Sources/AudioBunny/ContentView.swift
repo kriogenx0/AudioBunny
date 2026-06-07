@@ -3,11 +3,13 @@ import SwiftUI
 enum AppTab {
     case library
     case browse
+    case presets
 }
 
 struct ContentView: View {
     @EnvironmentObject var manager: PluginManager
     @EnvironmentObject var catalogManager: CatalogManager
+    @EnvironmentObject var presetManager: PresetManager
     @State private var selectedPlugin: AudioPlugin? = nil
     @State private var activeTab: AppTab = .library
 
@@ -24,7 +26,7 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .toolbar(removing: .sidebarToggle)
+            .removeSidebarToggle()
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
                     Button(action: manager.testAllUntested) {
@@ -46,6 +48,10 @@ struct ContentView: View {
             StoreView()
                 .tabItem { Label("Browse Plugins", systemImage: "magnifyingglass") }
                 .tag(AppTab.browse)
+
+            PresetsView()
+                .tabItem { Label("Presets", systemImage: "music.note.list") }
+                .tag(AppTab.presets)
         }
     }
 }
@@ -422,6 +428,18 @@ struct PluginDetailView: View {
         case .audioUnit: return .blue
         case .vst2: return .purple
         case .vst3: return .indigo
+        }
+    }
+}
+
+// MARK: - Backport: hide sidebar toggle on macOS 13
+
+private extension View {
+    @ViewBuilder func removeSidebarToggle() -> some View {
+        if #available(macOS 14.0, *) {
+            self.toolbar(removing: .sidebarToggle)
+        } else {
+            self
         }
     }
 }

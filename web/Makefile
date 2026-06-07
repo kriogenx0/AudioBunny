@@ -1,76 +1,62 @@
-PYTHON   := /opt/homebrew/bin/python3
-API_DIR  := api
-FE_DIR   := frontend
-VENV     := $(API_DIR)/.venv
-PIP      := $(VENV)/bin/pip
-UVICORN  := $(VENV)/bin/uvicorn
+RAILS_DIR := rails
+FE_DIR    := frontend
 
-IMAGE    := audiobunny
-PORT     := 8000
+.PHONY: dev dev-down rails-setup rails-console rails-logs \
+        docker-build docker-stop \
+        cap-setup cap-deploy \
+        clean help
 
-.PHONY: dev install install-api install-fe api fe \
-        docker-build docker-run docker-stop \
-        deploy-setup deploy rollback \
-        clean
+# ── Dev: delegate to root Makefile ────────────────────────────────────────────
+# Run 'make dev' from the project root instead.
 
-dev: install
-	@trap 'kill 0' SIGINT SIGTERM; \
-	(cd $(API_DIR) && ../$(UVICORN) main:app --reload --port 8000) & \
-	(cd $(FE_DIR) && npm run dev) & \
-	wait
+dev:
+	$(MAKE) -C .. dev
 
-install: install-api install-fe
+dev-down:
+	docker compose down
 
-install-api: $(VENV)
-	$(PIP) install -q fastapi "uvicorn[standard]" sqlmodel \
-		"python-jose[cryptography]" "passlib[bcrypt]" python-multipart aiofiles
+# ── Rails setup (first-time local, outside Docker) ────────────────────────────
 
-$(VENV):
-	$(PYTHON) -m venv $(VENV)
+rails-setup:
+	cd $(RAILS_DIR) && bundle install
+	cd $(RAILS_DIR) && bundle exec rails db:create db:migrate db:seed
 
-install-fe: $(FE_DIR)/node_modules
+rails-console:
+	cd $(RAILS_DIR) && bundle exec rails console
 
-$(FE_DIR)/node_modules: $(FE_DIR)/package.json
-	cd $(FE_DIR) && npm install
+rails-logs:
+	docker compose logs -f rails
 
-api: install-api
-	cd $(API_DIR) && ../$(UVICORN) main:app --reload --port 8000
-
-fe: install-fe
-	cd $(FE_DIR) && npm run dev
+# ── Docker ────────────────────────────────────────────────────────────────────
 
 docker-build:
-	docker build -t $(IMAGE) .
-
-docker-run: docker-build
-	docker run --rm -p $(PORT):8000 \
-		-v "$$(pwd)/api/audiobunny.db:/app/audiobunny.db" \
-		-v "$$(pwd)/api/thumbnails:/app/thumbnails" \
-		-v "$$(pwd)/api/downloads:/app/downloads" \
-		--name $(IMAGE) $(IMAGE)
+	docker compose build
 
 docker-stop:
-	docker stop $(IMAGE) 2>/dev/null || true
+	docker compose down --remove-orphans
 
-# ── Deployment (Fabric) ───────────────────────────────────────────────────────
-# Usage: make deploy HOST=deploy@audiobunny.example.com
-#        make rollback HOST=deploy@audiobunny.example.com
+# ── Capistrano deployment ─────────────────────────────────────────────────────
+# Usage: make cap-deploy HOST=deploy@yourserver.com
+# Requires ssh access and rbenv + ruby installed on server
 
-DEPLOY_VENV := deploy/.venv
-HOST        ?= deploy@audiobunny.example.com
+cap-setup:
+	cd $(RAILS_DIR) && bundle exec cap production deploy:setup
 
-$(DEPLOY_VENV):
-	python3 -m venv $(DEPLOY_VENV)
-	$(DEPLOY_VENV)/bin/pip install -q -r deploy/requirements.txt
+cap-deploy:
+	cd $(RAILS_DIR) && bundle exec cap production deploy
 
-deploy-setup: $(DEPLOY_VENV)
-	$(DEPLOY_VENV)/bin/fab -H $(HOST) setup
-
-deploy: $(DEPLOY_VENV)
-	$(DEPLOY_VENV)/bin/fab -H $(HOST) deploy
-
-rollback: $(DEPLOY_VENV)
-	$(DEPLOY_VENV)/bin/fab -H $(HOST) rollback
+# ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
-	rm -rf $(VENV) $(FE_DIR)/node_modules $(API_DIR)/audiobunny.db $(DEPLOY_VENV)
+	docker compose down --volumes --remove-orphans
+	rm -f $(RAILS_DIR)/db/development.sqlite3 $(RAILS_DIR)/db/production.sqlite3
+
+help:
+	@echo "AudioBunny web targets:"
+	@echo "  make dev          Build Docker images, start web stack, open macOS app in Xcode"
+	@echo "  make dev-down     Stop Docker web stack"
+	@echo "  make rails-setup  Install gems + seed DB (first-time local setup)"
+	@echo "  make rails-logs   Tail Rails log from Docker"
+	@echo "  make docker-build Rebuild Docker images"
+	@echo "  make cap-deploy   Deploy to production via Capistrano"
+	@echo "  make clean        Remove containers, volumes, and SQLite databases"

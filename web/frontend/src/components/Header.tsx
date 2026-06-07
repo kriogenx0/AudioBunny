@@ -40,6 +40,12 @@ export default function Header({ searchValue = '', onSearch }: HeaderProps) {
         >
           Browse
         </Link>
+        <Link
+          to="/presets"
+          className={`nav-link ${location.pathname.startsWith('/presets') ? 'active' : ''}`}
+        >
+          Presets
+        </Link>
         {user && (
           <Link
             to="/favorites"

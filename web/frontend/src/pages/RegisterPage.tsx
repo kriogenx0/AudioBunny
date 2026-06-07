@@ -18,9 +18,8 @@ export default function RegisterPage() {
     if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     setLoading(true)
     try {
-      await register(email, username, password)
-      const token = await login(username, password)
-      setToken(token.access_token)
+      const { token } = await register(email, username, password)
+      setToken(token)
       navigate('/')
     } catch (err: any) {
       setError(err?.response?.data?.detail ?? 'Registration failed. Please try again.')
