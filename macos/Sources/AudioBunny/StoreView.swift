@@ -108,7 +108,7 @@ struct CatalogFilterBar: View {
                     catalogManager.filterCategory = nil
                 }
                 ForEach(PluginCategory.allCases) { category in
-                    filterChip(category.rawValue, selected: catalogManager.filterCategory == category) {
+                    filterChip(category.label, selected: catalogManager.filterCategory == category) {
                         catalogManager.filterCategory = category
                     }
                 }
@@ -241,7 +241,7 @@ struct CatalogPluginDetailView: View {
                         Text(plugin.developer)
                             .foregroundStyle(.secondary)
                         HStack(spacing: 6) {
-                            Text(plugin.category.rawValue)
+                            Text(plugin.category.label)
                                 .font(.caption)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
@@ -287,7 +287,7 @@ struct CatalogPluginDetailView: View {
                     VStack(spacing: 0) {
                         infoRow("Developer", plugin.developer)
                         infoRow("Version", plugin.version)
-                        infoRow("Category", plugin.category.rawValue)
+                        infoRow("Category", plugin.category.label)
                         infoRow("Formats", plugin.formats.joined(separator: ", "))
                         infoRow("Price", plugin.price)
                         if !plugin.tags.isEmpty {

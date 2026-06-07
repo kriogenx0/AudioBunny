@@ -3,10 +3,17 @@ import Foundation
 // MARK: - Plugin Category
 
 enum PluginCategory: String, Codable, CaseIterable, Hashable, Identifiable {
-    case instrument = "Instrument"
-    case effect = "Effect"
+    case instrument
+    case effect
 
     var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .instrument: return "Instrument"
+        case .effect: return "Effect"
+        }
+    }
 
     var icon: String {
         switch self {
