@@ -1,44 +1,73 @@
-MACOS_DIR  := macos
-WEB_DIR    := web
-APP_BIN    := $(MACOS_DIR)/.build/debug/AudioBunny
-APP_BUNDLE := $(MACOS_DIR)/.build/debug/AudioBunny.app
+APP_NAME       := AudioBunny
+MACOS_DIR      := macos
+WEB_DIR        := web
 
-.PHONY: dev dev-down macos-build macos-bundle macos-run web-up web-down web-logs help
+DEBUG_BIN      := $(MACOS_DIR)/.build/debug/$(APP_NAME)
+RELEASE_BIN    := $(MACOS_DIR)/.build/release/$(APP_NAME)
+DEBUG_BUNDLE   := $(MACOS_DIR)/.build/debug/$(APP_NAME).app
+RELEASE_BUNDLE := $(MACOS_DIR)/.build/release/$(APP_NAME).app
+INSTALL_PATH   := /Applications/$(APP_NAME).app
 
-# ── Default: build + run everything ──────────────────────────────────────────
+.PHONY: all dev build setup clean open close install uninstall reinstall \
+        web-up web-down web-logs help
+.DEFAULT_GOAL := all
 
-dev: macos-bundle web-up
-	@echo ""
-	@echo "  Web app → http://localhost:5173"
-	@echo "  API     → http://localhost:3000"
-	@echo ""
-	@echo "  'make dev-down' stops Docker."
-	@echo ""
-	open $(APP_BUNDLE)
+# ── Default ───────────────────────────────────────────────────────────────────
 
-dev-down: web-down
+all: setup dev
 
-# ── macOS ─────────────────────────────────────────────────────────────────────
+# ── Development ───────────────────────────────────────────────────────────────
 
-macos-build:
-	@echo "▸ Building macOS app…"
-	@rm -rf $(APP_BUNDLE)
+setup:
+	@echo "▸ Starting web stack…"
+	docker compose -f $(WEB_DIR)/docker-compose.yml up -d --build
+
+dev:
+	@rm -rf $(DEBUG_BUNDLE)
+	@echo "▸ Building $(APP_NAME) (debug)…"
 	cd $(MACOS_DIR) && swift build -c debug
+	@mkdir -p $(DEBUG_BUNDLE)/Contents/MacOS
+	@cp $(DEBUG_BIN) $(DEBUG_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	@cp $(MACOS_DIR)/Info.plist $(DEBUG_BUNDLE)/Contents/Info.plist
+	open $(DEBUG_BUNDLE)
 
-# Wrap the SPM binary in a minimal .app bundle so 'open' works properly
-# (Dock icon, Cmd+Tab, window focus, etc.)
-macos-bundle: macos-build
-	@mkdir -p $(APP_BUNDLE)/Contents/MacOS
-	@cp $(APP_BIN) $(APP_BUNDLE)/Contents/MacOS/AudioBunny
-	@cp $(MACOS_DIR)/Info.plist $(APP_BUNDLE)/Contents/Info.plist
+# ── Production ────────────────────────────────────────────────────────────────
 
-macos-run: macos-bundle
-	open $(APP_BUNDLE)
+build:
+	@echo "▸ Building $(APP_NAME) (release)…"
+	cd $(MACOS_DIR) && swift build -c release
+	@mkdir -p $(RELEASE_BUNDLE)/Contents/MacOS
+	@cp $(RELEASE_BIN) $(RELEASE_BUNDLE)/Contents/MacOS/$(APP_NAME)
+	@cp $(MACOS_DIR)/Info.plist $(RELEASE_BUNDLE)/Contents/Info.plist
+
+open: build
+	open $(RELEASE_BUNDLE)
+
+close:
+	-killall "$(APP_NAME)" 2>/dev/null
+
+# ── Install ───────────────────────────────────────────────────────────────────
+
+install: build
+	@cp -R $(RELEASE_BUNDLE) $(INSTALL_PATH)
+	@echo "▸ Installed to $(INSTALL_PATH)"
+	open $(INSTALL_PATH)
+
+uninstall: close
+	@rm -rf $(INSTALL_PATH)
+	@echo "▸ Uninstalled $(APP_NAME)"
+
+reinstall: uninstall install
+
+# ── Cleanup ───────────────────────────────────────────────────────────────────
+
+clean:
+	@rm -rf $(MACOS_DIR)/.build
+	@echo "▸ Cleaned build artifacts"
 
 # ── Web (Docker) ──────────────────────────────────────────────────────────────
 
 web-up:
-	@echo "▸ Starting web stack in Docker…"
 	docker compose -f $(WEB_DIR)/docker-compose.yml up -d --build
 
 web-down:
@@ -50,12 +79,27 @@ web-logs:
 # ── Help ──────────────────────────────────────────────────────────────────────
 
 help:
-	@echo "Usage: make <target>"
 	@echo ""
-	@echo "  dev           Build macOS app, start web stack in Docker, launch app"
-	@echo "  dev-down      Stop Docker web stack"
-	@echo "  macos-build   Compile macOS app (swift build -c debug)"
-	@echo "  macos-run     Build and launch macOS app"
-	@echo "  web-up        Start web stack in Docker"
-	@echo "  web-down      Stop Docker web stack"
-	@echo "  web-logs      Tail Docker logs"
+	@echo "  Development"
+	@echo "    make              Build debug + start web stack + open app  (= make all)"
+	@echo "    make dev          Build debug, delete old bundle, open app"
+	@echo "    make setup        Start web stack in Docker"
+	@echo ""
+	@echo "  Production"
+	@echo "    make build        Build release bundle"
+	@echo "    make open         Build release + open"
+	@echo "    make close        Kill the running app"
+	@echo ""
+	@echo "  Install"
+	@echo "    make install      Build release + copy to /Applications + open"
+	@echo "    make uninstall    Kill app + remove from /Applications"
+	@echo "    make reinstall    uninstall + install"
+	@echo ""
+	@echo "  Cleanup"
+	@echo "    make clean        Remove all build artifacts"
+	@echo ""
+	@echo "  Web"
+	@echo "    make web-up       Start Docker web stack"
+	@echo "    make web-down     Stop Docker web stack"
+	@echo "    make web-logs     Tail Docker logs"
+	@echo ""
