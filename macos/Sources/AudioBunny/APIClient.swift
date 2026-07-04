@@ -108,6 +108,8 @@ enum APIClient {
         req.httpBody = try JSONSerialization.data(withJSONObject: bodyDict)
         return try await decode(perform: req)
     }
+
+    static func downloadPreset(_ id: Int) async throws -> Data {
         let req = try makeRequest("presets/\(id)/download")
         let (data, _) = try await URLSession.shared.data(for: req)
         return data
