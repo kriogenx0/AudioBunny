@@ -35,6 +35,26 @@ class LiveProjectManager: ObservableObject {
         isScanning = false
     }
 
+    var allUniquePlugins: [LiveProjectPlugin] {
+        var seen = Set<String>()
+        var result: [LiveProjectPlugin] = []
+        for project in projects {
+            for plugin in project.plugins {
+                let key = "\(plugin.type?.rawValue ?? "")|\(plugin.name.lowercased())"
+                if seen.insert(key).inserted { result.append(plugin) }
+            }
+        }
+        return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    func projectCount(for plugin: LiveProjectPlugin) -> Int {
+        projects.filter { project in
+            project.plugins.contains { p in
+                p.name.lowercased() == plugin.name.lowercased() && p.type == plugin.type
+            }
+        }.count
+    }
+
     static func parseProject(at url: URL) throws -> LiveProject {
         let xmlData = try decompressGzip(at: url)
         let xmlDoc = try XMLDocument(data: xmlData, options: [])
