@@ -4,6 +4,7 @@ enum AppTab {
     case library
     case browse
     case presets
+    case liveProjects
 }
 
 struct ContentView: View {
@@ -52,6 +53,10 @@ struct ContentView: View {
             PresetsView()
                 .tabItem { Label("Presets", systemImage: "music.note.list") }
                 .tag(AppTab.presets)
+
+            LiveProjectsView()
+                .tabItem { Label("Live Projects", systemImage: "waveform.badge.exclamationmark") }
+                .tag(AppTab.liveProjects)
         }
     }
 }
@@ -434,7 +439,7 @@ struct PluginDetailView: View {
 
 // MARK: - Backport: hide sidebar toggle on macOS 13
 
-private extension View {
+extension View {
     @ViewBuilder func removeSidebarToggle() -> some View {
         if #available(macOS 14.0, *) {
             self.toolbar(removing: .sidebarToggle)

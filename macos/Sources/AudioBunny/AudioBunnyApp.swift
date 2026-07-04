@@ -9,6 +9,7 @@ struct AudioBunnyApp: App {
     @StateObject private var catalogManager = CatalogManager()
     @StateObject private var downloadManager = DownloadManager()
     @StateObject private var presetManager = PresetManager()
+    @StateObject private var liveProjectManager = LiveProjectManager()
 
     var body: some Scene {
         WindowGroup {
@@ -17,6 +18,7 @@ struct AudioBunnyApp: App {
                 .environmentObject(catalogManager)
                 .environmentObject(downloadManager)
                 .environmentObject(presetManager)
+                .environmentObject(liveProjectManager)
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
                     downloadManager.pluginManager = pluginManager

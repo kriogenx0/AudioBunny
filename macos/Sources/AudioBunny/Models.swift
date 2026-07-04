@@ -116,3 +116,29 @@ class AudioPlugin: ObservableObject, Identifiable, Hashable {
         hasher.combine(id)
     }
 }
+
+// MARK: - Live Project Models
+
+struct LiveProjectPlugin: Identifiable {
+    let id = UUID()
+    let name: String
+    let manufacturer: String?
+    let type: PluginType?
+
+    func isInstalled(in plugins: [AudioPlugin]) -> Bool {
+        let nameLower = name.lowercased()
+        let nameNorm = nameLower.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
+        return plugins.contains { installed in
+            let iLower = installed.name.lowercased()
+            let iNorm = iLower.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "-", with: "")
+            return iLower == nameLower || iNorm == nameNorm
+        }
+    }
+}
+
+struct LiveProject: Identifiable {
+    let id = UUID()
+    let url: URL
+    var name: String { url.deletingPathExtension().lastPathComponent }
+    var plugins: [LiveProjectPlugin]
+}
