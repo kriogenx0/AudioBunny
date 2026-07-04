@@ -73,33 +73,53 @@ class LiveProjectManager: ObservableObject {
     @Published var isScanning = false
     @Published var scanError: String?
 
+    // Progress
+    @Published var scanCurrentIndex: Int = 0
+    @Published var scanTotalCount: Int = 0
+    @Published var scanCurrentFile: String = ""
+    @Published var scanFoundCount: Int = 0
+
     func scanDirectory(_ url: URL) async {
         isScanning = true
+        scanCurrentIndex = 0
+        scanTotalCount = 0
+        scanFoundCount = 0
+        scanCurrentFile = "Finding projects…"
         scanError = nil
+        projects = []
 
-        let found = await Task.detached(priority: .userInitiated) {
-            var result: [LiveProject] = []
+        // First pass: enumerate all .als paths (fast, no decompression)
+        let alsURLs: [URL] = await Task.detached(priority: .userInitiated) {
+            var urls: [URL] = []
             let accessing = url.startAccessingSecurityScopedResource()
             defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-
             guard let enumerator = FileManager.default.enumerator(
                 at: url,
                 includingPropertiesForKeys: [.isRegularFileKey],
                 options: [.skipsHiddenFiles]
-            ) else { return result }
-
+            ) else { return urls }
             for case let fileURL as URL in enumerator {
-                if fileURL.pathExtension.lowercased() == "als" {
-                    if let project = try? parseAbletonProject(at: fileURL) {
-                        result.append(project)
-                    }
-                }
+                if fileURL.pathExtension.lowercased() == "als" { urls.append(fileURL) }
             }
-            return result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            return urls
         }.value
 
-        projects = found
+        scanTotalCount = alsURLs.count
+        var result: [LiveProject] = []
+
+        // Second pass: parse each file, reporting progress per file
+        for (index, fileURL) in alsURLs.enumerated() {
+            scanCurrentIndex = index + 1
+            scanCurrentFile = fileURL.lastPathComponent
+            if let project = try? await Task.detached { try parseAbletonProject(at: fileURL) }.value {
+                result.append(project)
+                scanFoundCount += 1
+            }
+        }
+
+        projects = result.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
         isScanning = false
+        scanCurrentFile = ""
     }
 
     var allUniquePlugins: [LiveProjectPlugin] {

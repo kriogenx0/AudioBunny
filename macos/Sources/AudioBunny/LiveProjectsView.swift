@@ -53,15 +53,10 @@ struct LiveProjectsView: View {
                     message: "Click \"Scan Folder\" to scan a directory for Ableton Live projects."
                 )
             }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             if liveProjectManager.isScanning {
-                VStack(spacing: 8) {
-                    ProgressView()
-                    Text("Scanning…")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding()
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+                ScanProgressBar()
             }
         }
         .toolbar {
@@ -78,6 +73,56 @@ struct LiveProjectsView: View {
             if case .success(let urls) = result, let url = urls.first {
                 Task { await liveProjectManager.scanDirectory(url) }
             }
+        }
+    }
+}
+
+// MARK: - Scan Progress Bar
+
+struct ScanProgressBar: View {
+    @EnvironmentObject var liveProjectManager: LiveProjectManager
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 10) {
+                if liveProjectManager.scanTotalCount > 0 {
+                    ProgressView(
+                        value: Double(liveProjectManager.scanCurrentIndex),
+                        total: Double(liveProjectManager.scanTotalCount)
+                    )
+                    .progressViewStyle(.linear)
+                    .frame(width: 120)
+                    Text("\(liveProjectManager.scanCurrentIndex) of \(liveProjectManager.scanTotalCount)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text(liveProjectManager.scanCurrentFile)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text("·")
+                        .foregroundStyle(.tertiary)
+                    Text("\(liveProjectManager.scanFoundCount) found")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                } else {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 16, height: 16)
+                    Text(liveProjectManager.scanCurrentFile)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.bar)
         }
     }
 }
