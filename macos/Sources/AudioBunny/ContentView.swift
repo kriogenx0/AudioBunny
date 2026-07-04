@@ -55,7 +55,7 @@ struct ContentView: View {
                 .tag(AppTab.presets)
 
             LiveProjectsView()
-                .tabItem { Label("Live Projects", systemImage: "waveform.badge.exclamationmark") }
+                .tabItem { Label("Projects", systemImage: "waveform.badge.exclamationmark") }
                 .tag(AppTab.liveProjects)
         }
     }

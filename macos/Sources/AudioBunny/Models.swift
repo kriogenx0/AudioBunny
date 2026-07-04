@@ -66,7 +66,7 @@ extension PluginStatus: Equatable {
 
 // MARK: - Plugin Model
 
-class AudioPlugin: ObservableObject, Identifiable, Hashable {
+class AudioPlugin: ObservableObject, Identifiable, Hashable, @unchecked Sendable {
     let id = UUID()
     let name: String
     let manufacturer: String

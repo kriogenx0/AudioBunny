@@ -79,7 +79,7 @@ struct LiveProjectsView: View {
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
             }
         }
-        .navigationTitle("Live Projects")
+        .navigationTitle("Projects")
         .frame(minWidth: 220)
     }
 
