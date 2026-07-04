@@ -53,9 +53,10 @@ private func decompressAbletonFile(at url: URL) throws -> Data {
     process.arguments = ["-c", url.path]
     let outPipe = Pipe()
     process.standardOutput = outPipe
-    process.standardError = Pipe()
+    process.standardError = FileHandle.nullDevice
     try process.run()
     let data = outPipe.fileHandleForReading.readDataToEndOfFile()
+    try? outPipe.fileHandleForReading.close()
     process.waitUntilExit()
     guard process.terminationStatus == 0, !data.isEmpty else {
         throw NSError(domain: "LiveProjectManager", code: 1, userInfo: [
