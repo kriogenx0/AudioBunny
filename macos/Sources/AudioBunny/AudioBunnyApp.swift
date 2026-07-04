@@ -1,6 +1,8 @@
 import SwiftUI
 import AVFoundation
 
+let appVersion = "1.0.0"
+
 @main
 struct AudioBunnyApp: App {
     @StateObject private var pluginManager = PluginManager()
