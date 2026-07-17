@@ -22,6 +22,7 @@ struct AudioBunnyApp: App {
                 .frame(minWidth: 900, minHeight: 600)
                 .task {
                     downloadManager.pluginManager = pluginManager
+                    pluginManager.refresh()
                 }
         }
         .windowStyle(.titleBar)

@@ -14,6 +14,15 @@ let package = Package(
             swiftSettings: [
                 .unsafeFlags(["-parse-as-library"])
             ]
+        ),
+        .executableTarget(
+            name: "VST2Prober",
+            path: "Sources/VST2Prober"
+        ),
+        .testTarget(
+            name: "AudioBunnyTests",
+            dependencies: ["AudioBunny"],
+            path: "Tests/AudioBunnyTests"
         )
     ]
 )

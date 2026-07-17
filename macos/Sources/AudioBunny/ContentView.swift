@@ -1,6 +1,7 @@
 import SwiftUI
+import AppKit
 
-enum AppTab {
+enum AppTab: String {
     case library
     case browse
     case presets
@@ -12,7 +13,7 @@ struct ContentView: View {
     @EnvironmentObject var catalogManager: CatalogManager
     @EnvironmentObject var presetManager: PresetManager
     @State private var selectedPlugin: AudioPlugin? = nil
-    @State private var activeTab: AppTab = .browse
+    @AppStorage("audiobunny.activeTab") private var activeTab: AppTab = .browse
 
     var body: some View {
         TabView(selection: $activeTab) {
@@ -34,12 +35,6 @@ struct ContentView: View {
             .removeSidebarToggle()
             .toolbar {
                 ToolbarItemGroup(placement: .primaryAction) {
-                    Button(action: manager.testAllUntested) {
-                        Label("Test All", systemImage: "play.circle")
-                    }
-                    .disabled(manager.isScanning)
-                    .help("Test all untested plugins")
-
                     Button(action: manager.refresh) {
                         Label("Refresh", systemImage: "arrow.clockwise")
                     }
@@ -47,7 +42,7 @@ struct ContentView: View {
                     .help("Rescan for plugins")
                 }
             }
-            .tabItem { Label("My Plugins", systemImage: "puzzlepiece") }
+            .tabItem { Label("My Plugins", systemImage: "waveform") }
             .tag(AppTab.library)
 
             PresetsView()
@@ -101,6 +96,18 @@ struct SidebarView: View {
                 Divider()
             }
 
+            Button(action: manager.testAllUntested) {
+                Label("Test All", systemImage: "play.circle")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .disabled(manager.isScanning)
+            .help("Test all untested plugins")
+
+            Divider()
+
             // Plugin list with overlayed scanning indicator
             ZStack {
                 if manager.filteredPlugins.isEmpty {
@@ -108,9 +115,31 @@ struct SidebarView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List(manager.filteredPlugins, selection: $selectedPlugin) { plugin in
-                        PluginRowView(plugin: plugin)
-                            .tag(plugin)
+                    List(selection: $selectedPlugin) {
+                        if !instrumentGroups.isEmpty {
+                            Section("Instruments (\(instrumentGroups.count))") {
+                                ForEach(instrumentGroups, id: \.self) { group in
+                                    MergedPluginRowView(group: group)
+                                        .tag(group[0])
+                                }
+                            }
+                        }
+                        if !effectGroups.isEmpty {
+                            Section("Effects (\(effectGroups.count))") {
+                                ForEach(effectGroups, id: \.self) { group in
+                                    MergedPluginRowView(group: group)
+                                        .tag(group[0])
+                                }
+                            }
+                        }
+                        if !uncategorizedGroups.isEmpty {
+                            Section("Uncategorized (\(uncategorizedGroups.count))") {
+                                ForEach(uncategorizedGroups, id: \.self) { group in
+                                    MergedPluginRowView(group: group)
+                                        .tag(group[0])
+                                }
+                            }
+                        }
                     }
                     .listStyle(.sidebar)
                 }
@@ -128,6 +157,32 @@ struct SidebarView: View {
         .searchable(text: $manager.searchText, prompt: "Search plugins")
         .navigationTitle("AudioBunny")
         .frame(minWidth: 330)
+    }
+
+    // Plugins are already sorted by name, so identically-named plugins
+    // (e.g. the same instrument installed as both AU and VST3) are adjacent —
+    // just chunk them into runs of matching name.
+    private var groupedFilteredPlugins: [[AudioPlugin]] {
+        var groups: [[AudioPlugin]] = []
+        for plugin in manager.filteredPlugins {
+            if let lastIndex = groups.indices.last,
+               groups[lastIndex][0].name.caseInsensitiveCompare(plugin.name) == .orderedSame {
+                groups[lastIndex].append(plugin)
+            } else {
+                groups.append([plugin])
+            }
+        }
+        return groups
+    }
+
+    private var instrumentGroups: [[AudioPlugin]] {
+        groupedFilteredPlugins.filter { preferredCategory(for: $0) == .instrument }
+    }
+    private var effectGroups: [[AudioPlugin]] {
+        groupedFilteredPlugins.filter { preferredCategory(for: $0) == .effect }
+    }
+    private var uncategorizedGroups: [[AudioPlugin]] {
+        groupedFilteredPlugins.filter { preferredCategory(for: $0) == nil }
     }
 }
 
@@ -217,45 +272,87 @@ struct FilterBar: View {
     }
 }
 
-// MARK: - Plugin Row
+// MARK: - Plugin Row (one row per plugin name; same-name variants merge into it)
 
-struct PluginRowView: View {
-    @ObservedObject var plugin: AudioPlugin
-    @EnvironmentObject var manager: PluginManager
+struct MergedPluginRowView: View {
+    let group: [AudioPlugin]
+
+    private var primary: AudioPlugin { group[0] }
+
+    private var isAnyEnabled: Bool { group.contains { !$0.isDisabled } }
+
+    private var versionText: String {
+        Set(group.compactMap(\.version)).sorted().joined(separator: ", ")
+    }
+
+    private var category: PluginCategory? { preferredCategory(for: group) }
 
     var body: some View {
         HStack(spacing: 10) {
-            // Type icon
-            Image(systemName: plugin.type.icon)
-                .foregroundStyle(typeColor)
-                .frame(width: 18)
+            if let category {
+                Image(systemName: category.icon)
+                    .foregroundStyle(category == .instrument ? .green : .orange)
+                    .frame(width: 18)
+                    .help(category.label)
+            }
 
-            // Name + manufacturer
             VStack(alignment: .leading, spacing: 2) {
-                Text(plugin.name)
+                Text(primary.name)
                     .font(.body)
-                    .foregroundStyle(plugin.isDisabled ? .secondary : .primary)
+                    .foregroundStyle(isAnyEnabled ? .primary : .secondary)
                     .lineLimit(1)
-                Text(plugin.manufacturer)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                if !versionText.isEmpty {
+                    Text(versionText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
             }
 
             Spacer()
 
-            // Status badge
-            StatusBadge(status: plugin.status)
+            HStack(spacing: 8) {
+                ForEach(group) { plugin in
+                    HStack(spacing: 3) {
+                        PluginStatusIcon(status: plugin.status)
+                        PluginTypeTag(type: plugin.type)
+                    }
+                }
+            }
         }
         .padding(.vertical, 2)
-        .opacity(plugin.isDisabled ? 0.6 : 1.0)
+        .opacity(isAnyEnabled ? 1.0 : 0.6)
+    }
+}
+
+// MARK: - Plugin Type Tag
+
+struct PluginTypeTag: View {
+    let type: PluginType
+
+    var body: some View {
+        Text(label)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color, in: RoundedRectangle(cornerRadius: 4))
+            .foregroundStyle(.white)
     }
 
-    private var typeColor: Color {
-        switch plugin.type {
+    private var label: String {
+        switch type {
+        case .audioUnit: return "AU"
+        case .vst2: return "VST2"
+        case .vst3: return "VST3"
+        }
+    }
+
+    private var color: Color {
+        switch type {
         case .audioUnit: return .blue
-        case .vst2: return .purple
-        case .vst3: return .indigo
+        case .vst2: return Color(red: 0.36, green: 0.16, blue: 0.56)
+        case .vst3: return Color(red: 0.68, green: 0.42, blue: 0.98)
         }
     }
 }
@@ -297,22 +394,61 @@ struct StatusBadge: View {
     }
 }
 
+// MARK: - Plugin Status Icon (tested / untested indicator for sidebar rows)
+
+struct PluginStatusIcon: View {
+    let status: PluginStatus
+
+    var body: some View {
+        Group {
+            switch status {
+            case .untested:
+                Image(systemName: "questionmark.circle")
+                    .foregroundStyle(.secondary)
+            case .testing:
+                ProgressView()
+                    .controlSize(.mini)
+            case .active:
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            case .failed:
+                Image(systemName: "xmark.circle.fill")
+                    .foregroundStyle(.red)
+            case .disabled:
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(.gray)
+            }
+        }
+        .font(.caption)
+        .help(status.label)
+    }
+}
+
 // MARK: - Plugin Detail View
 
 struct PluginDetailView: View {
     @ObservedObject var plugin: AudioPlugin
     @EnvironmentObject var manager: PluginManager
 
+    // Other format variants of this same plugin (e.g. the AU and VST3 builds of
+    // the same instrument) so we can list every install location, not just the
+    // one that happened to be selected.
+    private var groupVariants: [AudioPlugin] {
+        manager.plugins
+            .filter { $0.name.caseInsensitiveCompare(plugin.name) == .orderedSame }
+            .sorted { $0.type.rawValue < $1.type.rawValue }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Header
                 HStack(alignment: .top, spacing: 16) {
-                    Image(systemName: plugin.type.icon)
+                    Image(systemName: plugin.category?.icon ?? "waveform")
                         .font(.largeTitle)
-                        .foregroundStyle(typeColor)
+                        .foregroundStyle(categoryColor)
                         .frame(width: 50, height: 50)
-                        .background(typeColor.opacity(0.1))
+                        .background(categoryColor.opacity(0.1))
                         .cornerRadius(10)
 
                     VStack(alignment: .leading, spacing: 4) {
@@ -354,8 +490,9 @@ struct PluginDetailView: View {
                 // Plugin info
                 GroupBox("Plugin Information") {
                     VStack(spacing: 0) {
-                        infoRow("Type", plugin.type.rawValue)
-                        infoRow("Location", plugin.fileURL.path)
+                        ForEach(groupVariants) { variant in
+                            locationRow(variant)
+                        }
                         if let sub = plugin.subtypeString {
                             infoRow("Subtype", sub)
                         }
@@ -428,11 +565,43 @@ struct PluginDetailView: View {
         Divider()
     }
 
+    @ViewBuilder
+    private func locationRow(_ variant: AudioPlugin) -> some View {
+        HStack(alignment: .top) {
+            Text("Location (\(variant.type.rawValue))")
+                .foregroundStyle(.secondary)
+                .frame(width: 140, alignment: .leading)
+            Text(variant.fileURL.path)
+                .textSelection(.enabled)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                NSWorkspace.shared.activateFileViewerSelecting([variant.fileURL])
+            } label: {
+                Image(systemName: "folder")
+            }
+            .buttonStyle(.plain)
+            .help("Show in Finder")
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        Divider()
+    }
+
     private var typeColor: Color {
         switch plugin.type {
         case .audioUnit: return .blue
         case .vst2: return .purple
         case .vst3: return .indigo
+        }
+    }
+
+    private var categoryColor: Color {
+        switch plugin.category {
+        case .instrument: return .green
+        case .effect: return .orange
+        case nil: return .secondary
         }
     }
 }

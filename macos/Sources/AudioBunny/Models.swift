@@ -9,14 +9,6 @@ enum PluginType: String, CaseIterable {
     case vst2 = "VST 2"
     case vst3 = "VST 3"
 
-    var icon: String {
-        switch self {
-        case .audioUnit: return "waveform"
-        case .vst2: return "puzzlepiece"
-        case .vst3: return "puzzlepiece.fill"
-        }
-    }
-
     var fileExtension: String? {
         switch self {
         case .audioUnit: return "component"
@@ -72,16 +64,20 @@ class AudioPlugin: ObservableObject, Identifiable, Hashable, @unchecked Sendable
     let manufacturer: String
     let type: PluginType
     let fileURL: URL
+    let version: String?
+    let category: PluginCategory?
     @Published var status: PluginStatus = .untested
 
     // Audio Unit specific
     var audioComponentDescription: AudioComponentDescription?
 
-    init(name: String, manufacturer: String, type: PluginType, fileURL: URL, componentDescription: AudioComponentDescription? = nil) {
+    init(name: String, manufacturer: String, type: PluginType, fileURL: URL, version: String? = nil, category: PluginCategory? = nil, componentDescription: AudioComponentDescription? = nil) {
         self.name = name
         self.manufacturer = manufacturer
         self.type = type
         self.fileURL = fileURL
+        self.version = version
+        self.category = category
         self.audioComponentDescription = componentDescription
     }
 

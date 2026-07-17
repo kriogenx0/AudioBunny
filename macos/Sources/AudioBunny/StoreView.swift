@@ -495,16 +495,6 @@ struct FlowLayout: Layout {
     }
 }
 
-// MARK: - Format icon helper (kept for any other usage)
-
-func formatIcon(_ format: String) -> (icon: String, color: Color) {
-    switch format {
-    case "AU":   return ("waveform",         .blue)
-    case "VST2": return ("puzzlepiece",      .purple)
-    case "VST3": return ("puzzlepiece.fill", .indigo)
-    default:     return ("music.note",       .secondary)
-    }
-}
 
 // MARK: - Submit Plugin Sheet
 
@@ -589,12 +579,25 @@ struct SubmitPluginSheet: View {
                             TextField("e.g. Xfer Records", text: $manufacturer).textFieldStyle(.roundedBorder)
                         }
                         row("Category") {
-                            Picker("", selection: $category) {
+                            HStack(spacing: 8) {
                                 ForEach(PluginCategory.allCases) { c in
-                                    Label(c.label, systemImage: c.icon).tag(c)
+                                    Button {
+                                        category = c
+                                    } label: {
+                                        Label(c.label, systemImage: c.icon)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(category == c ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.1))
+                                            .foregroundStyle(category == c ? Color.accentColor : Color.primary)
+                                            .cornerRadius(6)
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 6)
+                                                    .stroke(category == c ? Color.accentColor : Color.clear, lineWidth: 1)
+                                            )
+                                    }
+                                    .buttonStyle(.plain)
                                 }
                             }
-                            .pickerStyle(.segmented)
                         }
                         row("Formats") {
                             HStack(spacing: 8) {
