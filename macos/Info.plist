@@ -10,6 +10,8 @@
     <string>com.example.AudioBunny</string>
     <key>CFBundleExecutable</key>
     <string>AudioBunny</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>NSPrincipalClass</key>
