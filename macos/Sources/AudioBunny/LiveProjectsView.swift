@@ -1,17 +1,14 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-private let allProjectsID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
-
 struct LiveProjectsView: View {
     @EnvironmentObject var liveProjectManager: LiveProjectManager
     @EnvironmentObject var pluginManager: PluginManager
-    @State private var selection: UUID? = allProjectsID
+    @State private var selection: UUID?
     @State private var showDirectoryPicker = false
 
-    var selectedProject: LiveProject? {
-        guard let sel = selection, sel != allProjectsID else { return nil }
-        return liveProjectManager.projects.first { $0.id == sel }
+    private func isFolderID(_ id: UUID) -> Bool {
+        liveProjectManager.folders.contains { $0.id == id }
     }
 
     var body: some View {
@@ -22,23 +19,30 @@ struct LiveProjectsView: View {
         }
         .removeSidebarToggle()
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Scan Folder…") { showDirectoryPicker = true }
-                    .disabled(liveProjectManager.isScanning)
+            ToolbarItemGroup(placement: .primaryAction) {
+                Button(action: pluginManager.refresh) {
+                    Label("Rescan", systemImage: "arrow.clockwise")
+                }
+                .disabled(pluginManager.isScanning)
+                .help("Rescan installed plugins")
+
+                Button {
+                    showDirectoryPicker = true
+                } label: {
+                    Label("Add Project Folder…", systemImage: "folder.badge.plus")
+                }
             }
         }
         .fileImporter(
             isPresented: $showDirectoryPicker,
             allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
+            allowsMultipleSelection: true
         ) { result in
-            if case .success(let urls) = result, let url = urls.first {
-                Task { await liveProjectManager.scanDirectory(url) }
-            }
-        }
-        .onChange(of: liveProjectManager.isScanning) { scanning in
-            if !scanning && !liveProjectManager.projects.isEmpty {
-                selection = allProjectsID
+            if case .success(let urls) = result {
+                for url in urls { liveProjectManager.addFolder(url) }
+                if selection == nil { selection = urls.first.flatMap { u in
+                    liveProjectManager.folders.first { $0.url.path == u.path }?.id
+                } }
             }
         }
     }
@@ -48,23 +52,30 @@ struct LiveProjectsView: View {
     @ViewBuilder
     var sidebarContent: some View {
         ZStack {
-            if liveProjectManager.projects.isEmpty && !liveProjectManager.isScanning {
+            if liveProjectManager.folders.isEmpty {
                 LiveEmptyView(
                     icon: "folder.badge.questionmark",
-                    title: "No Projects",
-                    message: "Click \"Scan Folder\" to scan a directory for Ableton Live projects."
+                    title: "No Project Folders",
+                    message: "Click \"Add Project Folder…\" to track a directory of Ableton Live projects."
                 )
             } else {
                 List(selection: $selection) {
-                    AllProjectsRow()
-                        .tag(allProjectsID)
-
-                    if !liveProjectManager.projects.isEmpty {
-                        Section("Projects") {
-                            ForEach(liveProjectManager.projects) { project in
-                                ProjectSidebarRow(project: project)
-                                    .tag(project.id)
+                    ForEach(liveProjectManager.folders) { folder in
+                        FolderRow(folder: folder)
+                            .tag(folder.id)
+                            .contextMenu {
+                                Button("Rescan") {
+                                    Task { await liveProjectManager.rescan(folderID: folder.id) }
+                                }
+                                Button("Remove Folder", role: .destructive) {
+                                    if selection == folder.id { selection = nil }
+                                    liveProjectManager.removeFolder(folder.id)
+                                }
                             }
+
+                        ForEach(folder.projects) { project in
+                            ProjectSidebarRow(project: project)
+                                .tag(project.id)
                         }
                     }
                 }
@@ -74,7 +85,9 @@ struct LiveProjectsView: View {
         .navigationTitle("Projects")
         .frame(minWidth: 200)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if liveProjectManager.isScanning { ScanProgressBar() }
+            if let scanning = liveProjectManager.folders.first(where: { $0.isScanning }) {
+                ScanProgressBar(folder: scanning)
+            }
         }
     }
 
@@ -82,42 +95,43 @@ struct LiveProjectsView: View {
 
     @ViewBuilder
     var detailContent: some View {
-        if selection == allProjectsID || selection == nil {
-            PluginsListView(
-                plugins: liveProjectManager.allUniquePlugins,
-                showProjectCount: true
-            )
-            .navigationTitle("All Projects")
-        } else if let project = selectedProject {
-            PluginsListView(plugins: project.plugins, showProjectCount: false)
+        if let sel = selection, isFolderID(sel), let folder = liveProjectManager.folders.first(where: { $0.id == sel }) {
+            PluginsListView(plugins: folder.allUniquePlugins, folder: folder)
+                .navigationTitle(folder.name)
+        } else if let sel = selection, let project = liveProjectManager.project(withID: sel) {
+            PluginsListView(plugins: project.plugins)
                 .navigationTitle(project.name)
         } else {
             LiveEmptyView(
                 icon: "doc.richtext",
-                title: "Select a Project",
-                message: "Choose a project from the sidebar to see its plugins."
+                title: "Select a Folder or Project",
+                message: "Choose a project folder or project from the sidebar to see its plugins."
             )
         }
     }
 }
 
-// MARK: - All Projects Sidebar Row
+// MARK: - Folder Sidebar Row
 
-struct AllProjectsRow: View {
-    @EnvironmentObject var liveProjectManager: LiveProjectManager
+struct FolderRow: View {
     @EnvironmentObject var pluginManager: PluginManager
+    let folder: ProjectFolder
 
     var missingCount: Int {
-        liveProjectManager.allUniquePlugins.filter { !$0.isInstalled(in: pluginManager.plugins) }.count
+        folder.allUniquePlugins.filter { !$0.isInstalled(in: pluginManager.plugins) }.count
     }
 
     var body: some View {
         HStack {
+            Image(systemName: "folder.fill")
+                .foregroundStyle(.secondary)
+                .frame(width: 18)
             VStack(alignment: .leading, spacing: 2) {
-                Text("All Projects")
+                Text(folder.name)
                     .fontWeight(.medium)
-                if !liveProjectManager.projects.isEmpty {
-                    let n = liveProjectManager.projects.count
+                    .lineLimit(1)
+                if !folder.projects.isEmpty {
+                    let n = folder.projects.count
                     Text("\(n) project\(n == 1 ? "" : "s")")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -179,9 +193,8 @@ struct ProjectSidebarRow: View {
 
 struct PluginsListView: View {
     @EnvironmentObject var pluginManager: PluginManager
-    @EnvironmentObject var liveProjectManager: LiveProjectManager
     let plugins: [LiveProjectPlugin]
-    let showProjectCount: Bool
+    var folder: ProjectFolder? = nil
 
     var missing: [LiveProjectPlugin]   { plugins.filter { !$0.isInstalled(in: pluginManager.plugins) } }
     var installed: [LiveProjectPlugin] { plugins.filter {  $0.isInstalled(in: pluginManager.plugins) } }
@@ -189,7 +202,7 @@ struct PluginsListView: View {
     var body: some View {
         if plugins.isEmpty {
             LiveEmptyView(
-                icon: "puzzlepiece",
+                icon: "waveform",
                 title: "No Plugins",
                 message: "No plugins found in this selection."
             )
@@ -201,7 +214,7 @@ struct PluginsListView: View {
                             PluginUsageRow(
                                 plugin: plugin,
                                 isInstalled: false,
-                                projectCount: showProjectCount ? liveProjectManager.projectCount(for: plugin) : nil
+                                projectCount: folder?.projectCount(for: plugin)
                             )
                         }
                     }
@@ -212,7 +225,7 @@ struct PluginsListView: View {
                             PluginUsageRow(
                                 plugin: plugin,
                                 isInstalled: true,
-                                projectCount: showProjectCount ? liveProjectManager.projectCount(for: plugin) : nil
+                                projectCount: folder?.projectCount(for: plugin)
                             )
                         }
                     }
@@ -226,31 +239,35 @@ struct PluginsListView: View {
 // MARK: - Scan Progress Bar
 
 struct ScanProgressBar: View {
-    @EnvironmentObject var liveProjectManager: LiveProjectManager
+    let folder: ProjectFolder
 
     var body: some View {
         VStack(spacing: 0) {
             Divider()
             HStack(spacing: 10) {
-                if liveProjectManager.scanTotalCount > 0 {
+                Text(folder.name)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                Text("·").foregroundStyle(.tertiary)
+                if folder.scanTotalCount > 0 {
                     ProgressView(
-                        value: Double(liveProjectManager.scanCurrentIndex),
-                        total: Double(liveProjectManager.scanTotalCount)
+                        value: Double(folder.scanCurrentIndex),
+                        total: Double(folder.scanTotalCount)
                     )
                     .progressViewStyle(.linear)
                     .frame(width: 120)
-                    Text("\(liveProjectManager.scanCurrentIndex) of \(liveProjectManager.scanTotalCount)")
+                    Text("\(folder.scanCurrentIndex) of \(folder.scanTotalCount)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
                     Text("·").foregroundStyle(.tertiary)
-                    Text(liveProjectManager.scanCurrentFile)
+                    Text(folder.scanCurrentFile)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Text("·").foregroundStyle(.tertiary)
-                    Text("\(liveProjectManager.scanFoundCount) found")
+                    Text("\(folder.scanFoundCount) found")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
@@ -258,7 +275,7 @@ struct ScanProgressBar: View {
                     ProgressView()
                         .scaleEffect(0.6)
                         .frame(width: 16, height: 16)
-                    Text(liveProjectManager.scanCurrentFile)
+                    Text(folder.scanCurrentFile)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
