@@ -20,7 +20,7 @@ services:
       context: .
       dockerfile: Dockerfile.rails
     ports:
-      - "3000:3000"
+      - "3010:3000"
     volumes:
       - ./rails/storage/presets:/app/storage/presets
       - ./rails/log:/app/log
