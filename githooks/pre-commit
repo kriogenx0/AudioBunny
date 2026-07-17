@@ -1,0 +1,23 @@
+#!/bin/bash
+# Runs the macOS test suite (build + unit tests + launch stress test) before
+# allowing a commit, but only when the commit actually touches macos/ —
+# no point paying for a Swift build + relaunch loop on a web-only change.
+#
+# Activated via: git config core.hooksPath githooks
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+if git diff --cached --name-only | grep -q '^macos/'; then
+    echo "▸ macos/ changes detected — running test suite before commit…"
+    if ! make test; then
+        echo ""
+        echo "✗ Commit blocked: 'make test' failed. Fix the failures above, or use"
+        echo "  'git commit --no-verify' to bypass this check (not recommended)."
+        exit 1
+    fi
+else
+    echo "▸ No macos/ changes — skipping test suite."
+fi
