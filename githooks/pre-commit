@@ -1,7 +1,9 @@
 #!/bin/bash
-# Runs the macOS test suite (build + unit tests + launch stress test) before
-# allowing a commit, but only when the commit actually touches macos/ —
-# no point paying for a Swift build + relaunch loop on a web-only change.
+# Runs the macOS test suite (build + unit tests — fast, seconds) before
+# allowing a commit, but only when the commit actually touches macos/ — no
+# point paying for a Swift build on a web-only change. Does NOT run the
+# launch stress test (slow, relaunches the app repeatedly); that's a manual
+# `make test-stress` for specifically chasing a startup/scanning crash.
 #
 # Activated via: git config core.hooksPath githooks
 
