@@ -136,8 +136,51 @@ class PluginManager: ObservableObject {
             }
         }
 
+        // A user-assigned category (see setCategory) always wins over whatever
+        // auto-detection produced — applies to every format variant sharing a
+        // name, matching preferredCategory's cross-variant grouping.
+        let overrides = loadCategoryOverrides()
+        for plugin in deduped {
+            if let override = overrides[categoryOverrideKey(for: plugin)] {
+                plugin.category = override
+            }
+        }
+
         plugins = deduped.sorted { $0.name < $1.name }
         isScanning = false
+    }
+
+    // MARK: - Category Overrides (user-assigned, persisted across launches)
+
+    private let categoryOverrideDefaultsKey = "audiobunny.categoryOverrides"
+
+    /// Keyed by name only (not format) so setting a category for one variant
+    /// (e.g. the AU build) applies to every other format of the same plugin.
+    private func categoryOverrideKey(for plugin: AudioPlugin) -> String {
+        plugin.name.lowercased()
+    }
+
+    private func loadCategoryOverrides() -> [String: PluginCategory] {
+        guard let data = userDefaults.data(forKey: categoryOverrideDefaultsKey),
+              let overrides = try? JSONDecoder().decode([String: PluginCategory].self, from: data) else {
+            return [:]
+        }
+        return overrides
+    }
+
+    /// User-provided correction for a plugin AudioBunny couldn't categorize
+    /// (or got wrong). Persists so it survives rescans and relaunches, and
+    /// applies to every installed format variant of the same plugin name.
+    func setCategory(_ category: PluginCategory, for plugin: AudioPlugin) {
+        let key = categoryOverrideKey(for: plugin)
+        for variant in plugins where categoryOverrideKey(for: variant) == key {
+            variant.category = category
+        }
+        var overrides = loadCategoryOverrides()
+        overrides[key] = category
+        guard let data = try? JSONEncoder().encode(overrides) else { return }
+        userDefaults.set(data, forKey: categoryOverrideDefaultsKey)
+        notifyPluginsChanged()
     }
 
     // MARK: - Test History (persisted across launches)
@@ -300,6 +343,7 @@ class PluginManager: ObservableObject {
 
     private func performTest(_ plugin: AudioPlugin) async {
         plugin.status = .testing
+        notifyPluginsChanged()
 
         switch plugin.type {
         case .audioUnit:
@@ -311,6 +355,17 @@ class PluginManager: ObservableObject {
         }
 
         recordTestResult(for: plugin)
+        notifyPluginsChanged()
+    }
+
+    /// AudioPlugin's status/category are @Published on the plugin instance
+    /// itself, but PluginManager's own @Published `plugins` array only fires
+    /// for other views (e.g. My Projects, which reads pluginManager.plugins
+    /// via @EnvironmentObject) when the array is reassigned — an in-place
+    /// mutation to one plugin's status doesn't trigger that. Call this after
+    /// mutating any plugin's status/category outside of scan().
+    private func notifyPluginsChanged() {
+        plugins = plugins
     }
 
     private func testAudioUnit(_ plugin: AudioPlugin) async {
@@ -399,30 +454,39 @@ class PluginManager: ObservableObject {
             // Ensure disabled folder exists
             try? fm.createDirectory(at: disabledFolderURL, withIntermediateDirectories: true)
             let destination = disabledFolderURL.appendingPathComponent(source.lastPathComponent)
-            do {
-                if fm.fileExists(atPath: destination.path) {
-                    try fm.removeItem(at: destination)
-                }
-                try fm.moveItem(at: source, to: destination)
-                plugin.status = .disabled
-            } catch {
-                print("Failed to disable \(plugin.name): \(error)")
+            if fm.fileExists(atPath: destination.path) {
+                try? fm.removeItem(at: destination)
             }
+            // Most plugins live under root-owned /Library/Audio/Plug-Ins/…, which
+            // a plain move can't touch — fall back to an admin-privileged move
+            // (same as Finder would prompt for) rather than silently failing.
+            let moved = await Task.detached(priority: .userInitiated) {
+                moveItemElevatingIfNeeded(from: source, to: destination)
+            }.value
+            if moved {
+                plugin.status = .disabled
+            } else {
+                plugin.status = .failed("Couldn't disable — permission denied moving \(source.lastPathComponent)")
+            }
+            notifyPluginsChanged()
         } else {
             // Move back to the appropriate folder
             let destinationFolder = restoreDestination(for: plugin.type)
             try? fm.createDirectory(at: destinationFolder, withIntermediateDirectories: true)
             let destination = destinationFolder.appendingPathComponent(source.lastPathComponent)
-            do {
-                if fm.fileExists(atPath: destination.path) {
-                    try fm.removeItem(at: destination)
-                }
-                try fm.moveItem(at: source, to: destination)
+            if fm.fileExists(atPath: destination.path) {
+                try? fm.removeItem(at: destination)
+            }
+            let moved = await Task.detached(priority: .userInitiated) {
+                moveItemElevatingIfNeeded(from: source, to: destination)
+            }.value
+            if moved {
                 plugin.status = .untested
                 // Update the fileURL by rescanning
                 await scan()
-            } catch {
-                print("Failed to enable \(plugin.name): \(error)")
+            } else {
+                plugin.status = .failed("Couldn't enable — permission denied moving \(source.lastPathComponent)")
+                notifyPluginsChanged()
             }
         }
     }
@@ -645,4 +709,82 @@ func runProcessWithTimeout(executable: String, arguments: [String], timeoutSecon
     let data = pipe.fileHandleForReading.readDataToEndOfFile()
     try? pipe.fileHandleForReading.close()
     return data
+}
+
+// MARK: - Privileged File Moves
+
+/// Moves a file via `FileManager`, falling back to an admin-privileged move
+/// (prompting the user for their password, the same way Finder would) when
+/// the plain move fails. Most installed plugins live under the root-owned
+/// `/Library/Audio/Plug-Ins/…`, not the user-writable `~/Library` copy, so a
+/// plain `moveItem` there always fails with a permissions error.
+func moveItemElevatingIfNeeded(from source: URL, to destination: URL) -> Bool {
+    if (try? FileManager.default.moveItem(at: source, to: destination)) != nil {
+        return true
+    }
+    return privilegedMove(from: source.path, to: destination.path)
+}
+
+/// Runs `mv <from> <to>` with administrator privileges via AppleScript's
+/// `do shell script … with administrator privileges`, which triggers the
+/// standard macOS authentication dialog. Reserved as a fallback for when a
+/// plain move fails due to permissions — never used as the first attempt.
+private func privilegedMove(from sourcePath: String, to destPath: String) -> Bool {
+    let command = "mv \(shellQuoted(sourcePath)) \(shellQuoted(destPath))"
+    let script = "do shell script \(appleScriptQuoted(command)) with administrator privileges"
+
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+    process.arguments = ["-e", script]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+
+    guard (try? process.run()) != nil else { return false }
+    process.waitUntilExit()
+    return process.terminationStatus == 0
+}
+
+/// Wraps a path in single quotes for safe embedding in a shell command,
+/// escaping any embedded single quotes.
+private func shellQuoted(_ path: String) -> String {
+    "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+}
+
+/// Escapes a (already shell-quoted) string for embedding inside an
+/// AppleScript double-quoted string literal.
+private func appleScriptQuoted(_ command: String) -> String {
+    let escaped = command
+        .replacingOccurrences(of: "\\", with: "\\\\")
+        .replacingOccurrences(of: "\"", with: "\\\"")
+    return "\"\(escaped)\""
+}
+
+// MARK: - Async Timeout Helper
+
+enum TimeoutResult<T> {
+    case completed(T)
+    case timedOut
+}
+
+/// Races `operation` against a `seconds`-long sleep and returns whichever
+/// finishes first. Unlike `runProcessWithTimeout`, this doesn't kill anything
+/// on timeout — it's for racing arbitrary async work (e.g. Ableton project
+/// parsing), where "timed out" and "the operation itself returned normally"
+/// need to stay distinguishable to the caller.
+func withTimeout<T: Sendable>(
+    seconds: Double,
+    operation: @escaping @Sendable () async -> T
+) async -> TimeoutResult<T> {
+    await withTaskGroup(of: TimeoutResult<T>.self) { group in
+        group.addTask {
+            .completed(await operation())
+        }
+        group.addTask {
+            try? await Task.sleep(for: .seconds(seconds))
+            return .timedOut
+        }
+        let first = await group.next()!
+        group.cancelAll()
+        return first
+    }
 }

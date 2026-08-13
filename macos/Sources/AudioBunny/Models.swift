@@ -65,7 +65,7 @@ class AudioPlugin: ObservableObject, Identifiable, Hashable, @unchecked Sendable
     let type: PluginType
     let fileURL: URL
     let version: String?
-    let category: PluginCategory?
+    @Published var category: PluginCategory?
     @Published var status: PluginStatus = .untested
 
     // Audio Unit specific
@@ -137,4 +137,11 @@ struct LiveProject: Identifiable {
     let url: URL
     var name: String { url.deletingPathExtension().lastPathComponent }
     var plugins: [LiveProjectPlugin]
+    /// True if parsing this project timed out (see LiveProjectManager.rescan) —
+    /// it's still listed so it isn't silently missing, just with no plugin data.
+    var timedOut: Bool = false
+    /// True from the moment a folder scan discovers this file until parsing
+    /// finishes — all discovered projects appear in the list immediately
+    /// (see LiveProjectManager.rescan), filling in as each one is scanned.
+    var pending: Bool = false
 }
