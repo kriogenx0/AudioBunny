@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import AppKit
 
 struct LiveProjectsView: View {
     @EnvironmentObject var liveProjectManager: LiveProjectManager
@@ -12,14 +13,8 @@ struct LiveProjectsView: View {
     }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: .constant(.all)) {
-            sidebarContent
-        } detail: {
-            detailContent
-        }
-        .removeSidebarToggle()
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+        VStack(spacing: 0) {
+            TabActionBar(title: "My Projects") {
                 Button(action: pluginManager.refresh) {
                     Label("Rescan", systemImage: "arrow.clockwise")
                 }
@@ -31,6 +26,21 @@ struct LiveProjectsView: View {
                 } label: {
                     Label("Add Project Folder…", systemImage: "folder.badge.plus")
                 }
+            }
+
+            // Plain HStack instead of NavigationSplitView: NavigationSplitView
+            // automatically contributes a sidebar-collapse toggle to the title
+            // bar, and .toolbar(removing: .sidebarToggle) did not reliably
+            // suppress it. This sidebar is always shown, so an HStack avoids
+            // the automatic toolbar item entirely rather than fighting it.
+            HStack(spacing: 0) {
+                sidebarContent
+                    .frame(width: 280)
+
+                Divider()
+
+                detailContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .fileImporter(
@@ -61,17 +71,28 @@ struct LiveProjectsView: View {
             } else {
                 List(selection: $selection) {
                     ForEach(liveProjectManager.folders) { folder in
-                        FolderRow(folder: folder)
-                            .tag(folder.id)
-                            .contextMenu {
-                                Button("Rescan") {
-                                    Task { await liveProjectManager.rescan(folderID: folder.id) }
-                                }
-                                Button("Remove Folder", role: .destructive) {
-                                    if selection == folder.id { selection = nil }
-                                    liveProjectManager.removeFolder(folder.id)
-                                }
+                        FolderRow(
+                            folder: folder,
+                            onRescan: { Task { await liveProjectManager.rescan(folderID: folder.id) } },
+                            onDelete: {
+                                if selection == folder.id { selection = nil }
+                                liveProjectManager.removeFolder(folder.id)
                             }
+                        )
+                        .tag(folder.id)
+                        .contextMenu {
+                            Button("Rescan") {
+                                Task { await liveProjectManager.rescan(folderID: folder.id) }
+                            }
+                            Button("Remove Folder", role: .destructive) {
+                                if selection == folder.id { selection = nil }
+                                liveProjectManager.removeFolder(folder.id)
+                            }
+                        }
+
+                        if folder.isScanning {
+                            FolderScanProgressRow(folder: folder)
+                        }
 
                         ForEach(folder.projects) { project in
                             ProjectSidebarRow(project: project)
@@ -82,13 +103,6 @@ struct LiveProjectsView: View {
                 .listStyle(.sidebar)
             }
         }
-        .navigationTitle("Projects")
-        .frame(minWidth: 200)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if let scanning = liveProjectManager.folders.first(where: { $0.isScanning }) {
-                ScanProgressBar(folder: scanning)
-            }
-        }
     }
 
     // MARK: - Detail
@@ -96,11 +110,18 @@ struct LiveProjectsView: View {
     @ViewBuilder
     var detailContent: some View {
         if let sel = selection, isFolderID(sel), let folder = liveProjectManager.folders.first(where: { $0.id == sel }) {
-            PluginsListView(plugins: folder.allUniquePlugins, folder: folder)
-                .navigationTitle(folder.name)
+            VStack(spacing: 0) {
+                Text(folder.name)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                Divider()
+                PluginsListView(plugins: folder.allUniquePlugins, folder: folder)
+            }
         } else if let sel = selection, let project = liveProjectManager.project(withID: sel) {
-            PluginsListView(plugins: project.plugins)
-                .navigationTitle(project.name)
+            ProjectDetailView(project: project)
         } else {
             LiveEmptyView(
                 icon: "doc.richtext",
@@ -116,6 +137,9 @@ struct LiveProjectsView: View {
 struct FolderRow: View {
     @EnvironmentObject var pluginManager: PluginManager
     let folder: ProjectFolder
+    let onRescan: () -> Void
+    let onDelete: () -> Void
+    @State private var isHovering = false
 
     var missingCount: Int {
         folder.allUniquePlugins.filter { !$0.isInstalled(in: pluginManager.plugins) }.count
@@ -138,7 +162,22 @@ struct FolderRow: View {
                 }
             }
             Spacer()
-            if missingCount > 0 {
+            if isHovering {
+                HStack(spacing: 10) {
+                    Button(action: onRescan) {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Rescan")
+
+                    Button(action: onDelete) {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete")
+                }
+                .foregroundStyle(.secondary)
+            } else if missingCount > 0 {
                 HStack(spacing: 3) {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundStyle(.red)
@@ -150,6 +189,47 @@ struct FolderRow: View {
             }
         }
         .padding(.vertical, 2)
+        .onHover { hovering in isHovering = hovering }
+    }
+}
+
+// MARK: - Folder Scan Progress Row (inline, directly under the folder)
+
+struct FolderScanProgressRow: View {
+    let folder: ProjectFolder
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if folder.scanTotalCount > 0 {
+                ProgressView(
+                    value: Double(folder.scanCurrentIndex),
+                    total: Double(folder.scanTotalCount)
+                )
+                .progressViewStyle(.linear)
+                HStack(spacing: 4) {
+                    Text("\(folder.scanCurrentIndex) of \(folder.scanTotalCount)")
+                        .monospacedDigit()
+                    Text("·").foregroundStyle(.tertiary)
+                    Text(folder.scanCurrentFile)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            } else {
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .frame(width: 12, height: 12)
+                    Text(folder.scanCurrentFile.isEmpty ? "Finding projects…" : folder.scanCurrentFile)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(.leading, 16)
+        .padding(.vertical, 3)
     }
 }
 
@@ -157,7 +237,10 @@ struct FolderRow: View {
 
 struct ProjectSidebarRow: View {
     @EnvironmentObject var pluginManager: PluginManager
+    @EnvironmentObject var liveProjectManager: LiveProjectManager
     let project: LiveProject
+    @State private var isHovering = false
+    @State private var isRescanning = false
 
     var missingCount: Int {
         project.plugins.filter { !$0.isInstalled(in: pluginManager.plugins) }.count
@@ -165,16 +248,57 @@ struct ProjectSidebarRow: View {
 
     var body: some View {
         HStack {
+            if project.pending {
+                ProgressView()
+                    .scaleEffect(0.4)
+                    .frame(width: 16, height: 16)
+            } else if project.timedOut {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.yellow)
+                    .frame(width: 16)
+                    .help("Skipped: took longer than 1 minute to scan")
+            } else {
+                Image(systemName: missingCount == 0 ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                    .foregroundStyle(missingCount == 0 ? .green : .red)
+                    .frame(width: 16)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(project.name)
                     .lineLimit(1)
                 let n = project.plugins.count
-                Text(n == 0 ? "No plugins" : "\(n) plugin\(n == 1 ? "" : "s")")
+                Text(project.pending ? "Scanning…" : (project.timedOut ? "Skipped (timed out)" : (n == 0 ? "No plugins" : "\(n) plugin\(n == 1 ? "" : "s")")))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if missingCount > 0 {
+            if isRescanning {
+                ProgressView()
+                    .scaleEffect(0.5)
+                    .frame(width: 16, height: 16)
+            } else if isHovering {
+                HStack(spacing: 10) {
+                    Button {
+                        NSWorkspace.shared.activateFileViewerSelecting([project.url])
+                    } label: {
+                        Image(systemName: "folder")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show enclosing folder in Finder")
+
+                    Button {
+                        isRescanning = true
+                        Task {
+                            await liveProjectManager.rescanProject(projectID: project.id)
+                            isRescanning = false
+                        }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Rescan this project")
+                }
+                .foregroundStyle(.secondary)
+            } else if !project.pending && !project.timedOut && missingCount > 0 {
                 HStack(spacing: 3) {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundStyle(.red)
@@ -185,7 +309,75 @@ struct ProjectSidebarRow: View {
                 }
             }
         }
+        .padding(.leading, 16)
         .padding(.vertical, 2)
+        .onHover { hovering in isHovering = hovering }
+    }
+}
+
+// MARK: - Project Detail (location + plugins, or a Scan button if unscanned)
+
+struct ProjectDetailView: View {
+    @EnvironmentObject var liveProjectManager: LiveProjectManager
+    let project: LiveProject
+    @State private var isScanning = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(project.name)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+
+            HStack(spacing: 6) {
+                Image(systemName: "doc.text")
+                    .foregroundStyle(.secondary)
+                Text(project.url.path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([project.url])
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help("Show enclosing folder in Finder")
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            if project.pending {
+                VStack(spacing: 12) {
+                    Text("This project hasn't been scanned yet.")
+                        .foregroundStyle(.secondary)
+                    if isScanning {
+                        ProgressView()
+                    } else {
+                        Button {
+                            isScanning = true
+                            Task {
+                                await liveProjectManager.rescanProject(projectID: project.id)
+                                isScanning = false
+                            }
+                        } label: {
+                            Label("Scan", systemImage: "play.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                PluginsListView(plugins: project.plugins)
+            }
+        }
     }
 }
 
@@ -232,58 +424,6 @@ struct PluginsListView: View {
                 }
             }
             .listStyle(.inset)
-        }
-    }
-}
-
-// MARK: - Scan Progress Bar
-
-struct ScanProgressBar: View {
-    let folder: ProjectFolder
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 10) {
-                Text(folder.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                Text("·").foregroundStyle(.tertiary)
-                if folder.scanTotalCount > 0 {
-                    ProgressView(
-                        value: Double(folder.scanCurrentIndex),
-                        total: Double(folder.scanTotalCount)
-                    )
-                    .progressViewStyle(.linear)
-                    .frame(width: 120)
-                    Text("\(folder.scanCurrentIndex) of \(folder.scanTotalCount)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                    Text("·").foregroundStyle(.tertiary)
-                    Text(folder.scanCurrentFile)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Text("·").foregroundStyle(.tertiary)
-                    Text("\(folder.scanFoundCount) found")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                } else {
-                    ProgressView()
-                        .scaleEffect(0.6)
-                        .frame(width: 16, height: 16)
-                    Text(folder.scanCurrentFile)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.bar)
         }
     }
 }

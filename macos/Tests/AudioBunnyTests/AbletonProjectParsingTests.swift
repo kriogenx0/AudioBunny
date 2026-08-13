@@ -94,4 +94,30 @@ final class AbletonProjectParsingTests: XCTestCase {
         let project = try parseAbletonProject(at: url)
         XCTAssertTrue(project.plugins.isEmpty)
     }
+
+    // MARK: - parseAbletonProjectWithTimeout
+
+    func testTimeoutReturnsProperResultForFastFile() async throws {
+        let xml = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <Ableton><LiveSet>
+          <Vst3PluginInfo><Name Value="Serum"/><Vendor Value="Xfer Records"/></Vst3PluginInfo>
+        </LiveSet></Ableton>
+        """
+        let url = try makeGzippedAlsFile(named: "FastTrack", xml: xml)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let project = await parseAbletonProjectWithTimeout(at: url, timeoutSeconds: 30)
+
+        XCTAssertNotNil(project)
+        XCTAssertEqual(project?.timedOut, false)
+        XCTAssertEqual(project?.plugins.count, 1)
+    }
+
+    func testTimeoutReturnsNilForGenuineFailure() async {
+        let missingURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).als")
+        let project = await parseAbletonProjectWithTimeout(at: missingURL, timeoutSeconds: 5)
+        XCTAssertNil(project)
+    }
+
 }

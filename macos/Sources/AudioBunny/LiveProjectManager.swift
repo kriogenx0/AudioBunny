@@ -47,18 +47,29 @@ func parseAbletonProject(at url: URL) throws -> LiveProject {
     return LiveProject(url: url, plugins: plugins)
 }
 
+/// Parses with an overall time budget. decompressAbletonFile already bounds
+/// the gunzip step itself, but this is the outer safety net in case parsing
+/// as a whole doesn't finish in time — nil means "genuinely failed, skip it"
+/// (unchanged prior behavior); a project with `timedOut: true` means "still
+/// running after `timeoutSeconds`, but list it rather than silently drop it."
+func parseAbletonProjectWithTimeout(at url: URL, timeoutSeconds: Double) async -> LiveProject? {
+    switch await withTimeout(seconds: timeoutSeconds, operation: {
+        try? await Task.detached { try parseAbletonProject(at: url) }.value
+    }) {
+    case .completed(let project): return project
+    case .timedOut: return LiveProject(url: url, plugins: [], timedOut: true)
+    }
+}
+
 private func decompressAbletonFile(at url: URL) throws -> Data {
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/gunzip")
-    process.arguments = ["-c", url.path]
-    let outPipe = Pipe()
-    process.standardOutput = outPipe
-    process.standardError = FileHandle.nullDevice
-    try process.run()
-    let data = outPipe.fileHandleForReading.readDataToEndOfFile()
-    try? outPipe.fileHandleForReading.close()
-    process.waitUntilExit()
-    guard process.terminationStatus == 0, !data.isEmpty else {
+    // Bounded with a timeout+kill (same helper used for VST2 probing): a file
+    // on a stalled network mount, or a corrupt/oversized gzip stream, can hang
+    // gunzip indefinitely otherwise.
+    guard let data = runProcessWithTimeout(
+        executable: "/usr/bin/gunzip",
+        arguments: ["-c", url.path],
+        timeoutSeconds: 60
+    ), !data.isEmpty else {
         throw NSError(domain: "LiveProjectManager", code: 1, userInfo: [
             NSLocalizedDescriptionKey: "Could not read \(url.lastPathComponent)"
         ])
@@ -99,6 +110,52 @@ struct ProjectFolder: Identifiable {
             }
         }.count
     }
+}
+
+/// Caps simultaneous project parses at 10 *globally*, across every folder —
+/// not per folder. Each parse spawns its own gunzip subprocess, and folders
+/// are each scanned in their own Task (see LiveProjectManager.rescan/addFolder/
+/// init), so without a shared limiter, N folders scanning at once could spawn
+/// up to N×10 subprocesses simultaneously. Every parse acquires a slot here
+/// before doing any real work and releases it when done; a folder's full file
+/// list is enumerated up front (fast, no decompression) and only the actual
+/// parsing is throttled.
+actor ProjectScanLimiter {
+    static let shared = ProjectScanLimiter(maxConcurrent: 10)
+
+    private let maxConcurrent: Int
+    private var available: Int
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(maxConcurrent: Int) {
+        self.maxConcurrent = maxConcurrent
+        self.available = maxConcurrent
+    }
+
+    func acquire() async {
+        if available > 0 {
+            available -= 1
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func release() {
+        if waiters.isEmpty {
+            available += 1
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
+/// Parses a single project's file, waiting for a free global slot first (see
+/// `ProjectScanLimiter`) so at most 10 parses run at once across all folders.
+private func parseAbletonProjectThrottled(at url: URL) async -> LiveProject? {
+    await ProjectScanLimiter.shared.acquire()
+    let result = await parseAbletonProjectWithTimeout(at: url, timeoutSeconds: 60)
+    await ProjectScanLimiter.shared.release()
+    return result
 }
 
 // MARK: - Manager
@@ -171,22 +228,73 @@ class LiveProjectManager: ObservableObject {
         guard let idx2 = folders.firstIndex(where: { $0.id == folderID }) else { return }
         folders[idx2].scanTotalCount = alsURLs.count
 
-        // Second pass: parse each file, publishing each project as soon as it's found
-        // so the sidebar list fills in live during the scan.
-        for (index, fileURL) in alsURLs.enumerated() {
-            guard let idx3 = folders.firstIndex(where: { $0.id == folderID }) else { return }
-            folders[idx3].scanCurrentIndex = index + 1
-            folders[idx3].scanCurrentFile = fileURL.lastPathComponent
-            if let project = try? await Task.detached { try parseAbletonProject(at: fileURL) }.value {
-                folders[idx3].projects.append(project)
-                folders[idx3].scanFoundCount += 1
+        // Show every discovered project immediately as a pending placeholder
+        // (name known, no plugin data yet), sorted up front — the sidebar list
+        // fills in as each one is actually scanned below, instead of projects
+        // trickling in one at a time as they finish parsing.
+        folders[idx2].projects = alsURLs
+            .map { LiveProject(url: $0, plugins: [], pending: true) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+        // Second pass: parse every file, but each parse waits for a free slot
+        // on the *global* ProjectScanLimiter (shared across every folder, not
+        // just this one) before doing real work, so at most 10 gunzip
+        // subprocesses run at once no matter how many folders are scanning
+        // simultaneously. All tasks are queued here; the limiter is what
+        // actually throttles them.
+        var completedCount = 0
+
+        await withTaskGroup(of: (URL, LiveProject?).self) { group in
+            for fileURL in alsURLs {
+                group.addTask {
+                    (fileURL, await parseAbletonProjectThrottled(at: fileURL))
+                }
+            }
+
+            while let (fileURL, result) = await group.next() {
+                guard let idx3 = folders.firstIndex(where: { $0.id == folderID }) else {
+                    group.cancelAll()
+                    return
+                }
+
+                completedCount += 1
+                folders[idx3].scanCurrentIndex = completedCount
+                folders[idx3].scanCurrentFile = fileURL.lastPathComponent
+
+                if let projIdx = folders[idx3].projects.firstIndex(where: { $0.url == fileURL }) {
+                    if let project = result {
+                        folders[idx3].projects[projIdx].plugins = project.plugins
+                        folders[idx3].projects[projIdx].timedOut = project.timedOut
+                        folders[idx3].projects[projIdx].pending = false
+                        folders[idx3].scanFoundCount += 1
+                    } else {
+                        // Genuine parse failure (not a timeout) — drop the placeholder,
+                        // matching the prior behavior of never listing unparseable files.
+                        folders[idx3].projects.remove(at: projIdx)
+                    }
+                }
             }
         }
 
-        guard let idx4 = folders.firstIndex(where: { $0.id == folderID }) else { return }
-        folders[idx4].projects.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-        folders[idx4].isScanning = false
-        folders[idx4].scanCurrentFile = ""
+        guard let idx5 = folders.firstIndex(where: { $0.id == folderID }) else { return }
+        folders[idx5].isScanning = false
+        folders[idx5].scanCurrentFile = ""
+    }
+
+    /// Re-parses a single project's .als file in place, preserving its id
+    /// (stable for UI selection) while refreshing its plugin data.
+    func rescanProject(projectID: UUID) async {
+        guard let folderIdx = folders.firstIndex(where: { folder in folder.projects.contains { $0.id == projectID } }),
+              let projectIdx = folders[folderIdx].projects.firstIndex(where: { $0.id == projectID }) else { return }
+        let url = folders[folderIdx].projects[projectIdx].url
+
+        guard let updated = await parseAbletonProjectThrottled(at: url) else { return }
+
+        // Re-locate in case folders/projects changed while we were awaiting.
+        guard let folderIdx2 = folders.firstIndex(where: { folder in folder.projects.contains { $0.id == projectID } }),
+              let projectIdx2 = folders[folderIdx2].projects.firstIndex(where: { $0.id == projectID }) else { return }
+        folders[folderIdx2].projects[projectIdx2].plugins = updated.plugins
+        folders[folderIdx2].projects[projectIdx2].timedOut = updated.timedOut
     }
 
     var isScanning: Bool { folders.contains { $0.isScanning } }

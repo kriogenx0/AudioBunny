@@ -72,4 +72,33 @@ final class ProcessHelperTests: XCTestCase {
         let data = runProcessWithTimeout(executable: "/no/such/binary", arguments: [], timeoutSeconds: 5)
         XCTAssertNil(data)
     }
+
+    // MARK: - withTimeout (generic async race, not process-specific)
+
+    func testGenericTimeoutReturnsCompletedForFastOperation() async {
+        let result = await withTimeout(seconds: 5) { () -> Int in
+            42
+        }
+        guard case .completed(let value) = result else {
+            return XCTFail("expected .completed")
+        }
+        XCTAssertEqual(value, 42)
+    }
+
+    /// Regression test for the "project can't be scanned" case: an operation
+    /// that never finishes (simulating a stalled read, e.g. a network mount)
+    /// must be reported as .timedOut promptly, not block the caller.
+    func testGenericTimeoutReturnsTimedOutForSlowOperation() async {
+        let start = Date()
+        let result = await withTimeout(seconds: 0.3) { () -> Int in
+            try? await Task.sleep(for: .seconds(30))
+            return 42
+        }
+        let elapsed = Date().timeIntervalSince(start)
+
+        guard case .timedOut = result else {
+            return XCTFail("expected .timedOut")
+        }
+        XCTAssertLessThan(elapsed, 5, "should return at the 0.3s timeout, not wait for the 30s operation")
+    }
 }
