@@ -19,3 +19,5 @@ test:
 production:
   <<: *default
   database: <%= ENV.fetch("DB_NAME", "audiobunny_production") %>
+  # Managed MySQL clusters (see web/DEPLOY.md) enforce TLS on every connection.
+  ssl_mode: required
