@@ -15,28 +15,55 @@ struct StoreView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    header
+                    searchField
                     filterBar
                     pluginGrid
                 }
                 .padding(20)
             }
-            .navigationTitle("Discover")
-            .searchable(text: $catalogManager.searchText, placement: .toolbar, prompt: "Search plugins")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showSubmitSheet = true
-                    } label: {
-                        Label("Submit Plugin", systemImage: "plus.circle")
-                    }
-                    .help("Submit a plugin to the catalog")
+        }
+        .sheet(isPresented: $showSubmitSheet) {
+            SubmitPluginSheet(isPresented: $showSubmitSheet)
+                .environmentObject(presetManager)
+        }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Discover")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+            HStack {
+                Text("Browse instruments, effects, and presets shared by the community, and install them straight into your plugin folders.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    showSubmitSheet = true
+                } label: {
+                    Label("Submit Plugin", systemImage: "plus.circle")
                 }
-            }
-            .sheet(isPresented: $showSubmitSheet) {
-                SubmitPluginSheet(isPresented: $showSubmitSheet)
-                    .environmentObject(presetManager)
+                .help("Submit a plugin to the catalog")
             }
         }
+    }
+
+    // MARK: Search
+
+    private var searchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Search plugins", text: $catalogManager.searchText)
+                .textFieldStyle(.plain)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+        .frame(maxWidth: 320, alignment: .leading)
     }
 
     // MARK: Filter bar
@@ -305,7 +332,6 @@ struct CatalogPluginDetailPage: View {
                 .padding(28)
             }
         }
-        .navigationTitle(plugin.name)
         .navigationBarBackButtonHidden(false)
     }
 
