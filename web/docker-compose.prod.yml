@@ -1,0 +1,30 @@
+# Production stack for the app droplet — just the Rails API. No `db` service
+# (the database is a managed MySQL instance, not co-located with the app) and
+# no `web` service (nginx serves the React build copied by deploy.sh).
+#
+# Deployed via this repo's own deploy/deploy.sh, which manages nginx/certbot
+# and this file's .env on the host — see that script and web/DEPLOY.md.
+# ~/Sites/server-config is bootstrapping-only (installs Docker/nginx/certbot,
+# creates the deploy account); it doesn't touch this app's directory at all.
+# deploy.sh assigns HOST_PORT (in .env) on first run and nginx reverse-
+# proxies to it. GitHub Actions builds the image and streams it to
+# `docker load` on the server before deploy.sh runs.
+#
+# Matches ~/Sites/pocketproducer-web's docker-compose.prod.yml (same repo
+# owner's other Rails app on this VPS) — see web/DEPLOY.md.
+services:
+  api:
+    image: audio-bunny-com-api:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      RAILS_ENV: production
+    ports:
+      - "127.0.0.1:${HOST_PORT}:3000"
+    volumes:
+      - storage:/app/storage
+      - log:/app/log
+
+volumes:
+  storage:
+  log:

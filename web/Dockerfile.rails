@@ -1,21 +1,79 @@
-FROM ruby:3.3-slim
+# syntax = docker/dockerfile:1
+#
+# Multi-stage build matching ~/Sites/pocketproducer-web's backend/Dockerfile
+# (same repo owner's other Rails app on the same VPS) — see web/DEPLOY.md.
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    default-libmysqlclient-dev \
-    libyaml-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Make sure RUBY_VERSION matches rails/.ruby-version
+ARG RUBY_VERSION=3.3.0
+FROM ruby:$RUBY_VERSION-slim AS base
 
 WORKDIR /app
 
-COPY rails/Gemfile ./
-RUN bundle config set without 'development test' \
- && bundle install
+# Packages needed at runtime in every stage
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y default-libmysqlclient-dev curl && \
+    rm -rf /var/lib/apt/lists/*
+
+
+# ---- dev: full toolchain; web/docker-compose.yml bind-mounts source over this at runtime ----
+FROM base AS dev
+
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y build-essential libyaml-dev git pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY rails/Gemfile rails/Gemfile.lock* ./
+RUN bundle install
 
 COPY rails/ .
 
-RUN mkdir -p storage/presets db tmp/pids tmp/sockets log \
-    && chmod +x bin/rails
+EXPOSE 3000
+CMD ["./bin/rails", "server", "-b", "0.0.0.0"]
+
+
+# ---- build: throw-away stage that compiles gems for production ----
+FROM base AS build
+
+# No BUNDLE_DEPLOYMENT here (unlike pocketproducer-web's Dockerfile) — this
+# app doesn't commit Gemfile.lock (see web/rails/Gemfile.lock's .gitignore
+# entry), and deployment mode hard-requires one to already exist.
+ENV RAILS_ENV="production" \
+    BUNDLE_PATH="/usr/local/bundle" \
+    BUNDLE_WITHOUT="development test"
+
+RUN apt-get update -qq && \
+    apt-get install --no-install-recommends -y build-essential libyaml-dev git pkg-config && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY rails/Gemfile rails/Gemfile.lock* ./
+RUN bundle install && \
+    rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
+
+COPY rails/ .
+
+
+# ---- production: final slim runtime image ----
+FROM base AS production
+
+# No BUNDLE_DEPLOYMENT here (unlike pocketproducer-web's Dockerfile) — this
+# app doesn't commit Gemfile.lock (see web/rails/Gemfile.lock's .gitignore
+# entry), and deployment mode hard-requires one to already exist.
+ENV RAILS_ENV="production" \
+    BUNDLE_PATH="/usr/local/bundle" \
+    BUNDLE_WITHOUT="development test"
+
+# Copy built artifacts: gems, application
+COPY --from=build /usr/local/bundle /usr/local/bundle
+COPY --from=build /app /app
+
+RUN mkdir -p storage/presets db tmp/pids tmp/sockets log && \
+    chmod +x bin/rails bin/docker-entrypoint && \
+    useradd rails --create-home --shell /bin/bash && \
+    chown -R rails:rails db log storage tmp
+USER rails:rails
+
+# Entrypoint runs db:prepare (create + migrate) on every start.
+ENTRYPOINT ["/app/bin/docker-entrypoint"]
 
 EXPOSE 3000
+CMD ["./bin/rails", "server"]

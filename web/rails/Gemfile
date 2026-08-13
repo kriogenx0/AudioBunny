@@ -11,10 +11,3 @@ gem "jwt", "~> 2.8"
 group :development do
   gem "debug"
 end
-
-group :deploy do
-  gem "capistrano", "~> 3.18", require: false
-  gem "capistrano3-puma", "~> 6.0", require: false
-  gem "capistrano-bundler", "~> 2.1", require: false
-  gem "capistrano-rbenv", "~> 2.2", require: false
-end

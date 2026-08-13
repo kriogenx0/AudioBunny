@@ -9,8 +9,6 @@ xcuserdata/
 timeline.xctimeline
 playground.xcworkspace
 .swiftpm/
-*.o
-*.d
 Carthage/Build/
 fastlane/report.xml
 fastlane/Preview.html
