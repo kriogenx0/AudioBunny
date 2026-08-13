@@ -1,11 +1,33 @@
 import SwiftUI
 import AppKit
+import Combine
 
-enum AppTab: String {
-    case library
+enum AppTab: String, CaseIterable {
     case browse
+    case library
     case presets
+    case samples
     case liveProjects
+
+    var title: String {
+        switch self {
+        case .browse: return "Discover"
+        case .library: return "My Plugins"
+        case .presets: return "Presets"
+        case .liveProjects: return "My Projects"
+        case .samples: return "Samples"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .browse: return "safari"
+        case .library: return "waveform"
+        case .presets: return "music.note.list"
+        case .liveProjects: return "waveform.badge.exclamationmark"
+        case .samples: return "play.circle"
+        }
+    }
 }
 
 struct ContentView: View {
@@ -13,46 +35,183 @@ struct ContentView: View {
     @EnvironmentObject var catalogManager: CatalogManager
     @EnvironmentObject var presetManager: PresetManager
     @State private var selectedPlugin: AudioPlugin? = nil
+    @State private var showAccountSheet = false
     @AppStorage("audiobunny.activeTab") private var activeTab: AppTab = .browse
 
     var body: some View {
-        TabView(selection: $activeTab) {
-            StoreView()
-                .tabItem { Label("Discover", systemImage: "safari") }
-                .tag(AppTab.browse)
+        VStack(spacing: 0) {
+            MainTabBar(activeTab: $activeTab)
 
-            NavigationSplitView(columnVisibility: .constant(.all)) {
+            Group {
+                switch activeTab {
+                case .browse:
+                    StoreView()
+                case .library:
+                    libraryTab
+                case .presets:
+                    PresetsView()
+                case .liveProjects:
+                    LiveProjectsView()
+                case .samples:
+                    SamplesView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .removeSidebarToggle()
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                accountButton
+            }
+        }
+        .sheet(isPresented: $showAccountSheet) {
+            AccountSheet(isPresented: $showAccountSheet)
+                .environmentObject(presetManager)
+        }
+    }
+
+    @ViewBuilder
+    private var accountButton: some View {
+        if let user = presetManager.currentUser {
+            Menu {
+                Label(user.username, systemImage: "person.circle.fill")
+                    .font(.headline)
+                Divider()
+                Button("Sign Out") { presetManager.logout() }
+            } label: {
+                Label(user.username, systemImage: "person.circle.fill")
+            }
+        } else {
+            Button { showAccountSheet = true } label: {
+                Label("Sign In", systemImage: "person.circle")
+            }
+        }
+    }
+
+    private var libraryTab: some View {
+        VStack(spacing: 0) {
+            TabActionBar(title: "My Plugins") {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField("Search plugins", text: $manager.searchText)
+                        .textFieldStyle(.plain)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+                .frame(width: 220)
+
+                Button(action: manager.refresh) {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                .disabled(manager.isScanning)
+                .help("Rescan for plugins")
+            }
+
+            // Plain HStack instead of NavigationSplitView: macOS automatically
+            // contributes a sidebar-collapse toggle to the title bar for any
+            // NavigationSplitView, and .toolbar(removing: .sidebarToggle) did
+            // not reliably suppress it here. Since this sidebar is always
+            // shown (never meant to collapse), an HStack sidesteps the
+            // automatic toolbar item entirely rather than fighting it.
+            HStack(spacing: 0) {
                 SidebarView(selectedPlugin: $selectedPlugin)
-            } detail: {
+                    .frame(width: 330)
+
+                Divider()
+
                 if let plugin = selectedPlugin {
                     PluginDetailView(plugin: plugin)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     Text("Select a plugin")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
-            .removeSidebarToggle()
-            .toolbar {
-                ToolbarItemGroup(placement: .primaryAction) {
-                    Button(action: manager.refresh) {
-                        Label("Refresh", systemImage: "arrow.clockwise")
-                    }
-                    .disabled(manager.isScanning)
-                    .help("Rescan for plugins")
+        }
+    }
+}
+
+// MARK: - Static top-level tab bar
+
+/// Rendered as ordinary content (not a window toolbar item), so its layout
+/// never depends on what buttons the active tab happens to show — unlike the
+/// native `TabView`, whose macOS tab-selector lives in the unified toolbar
+/// alongside each tab's own `.toolbar` content and re-centers (visibly
+/// shifting position) whenever that trailing content's width changes between
+/// tabs. Each tab instead renders its own controls in a `TabActionBar` below.
+struct MainTabBar: View {
+    @Binding var activeTab: AppTab
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                ForEach(AppTab.allCases, id: \.self) { tab in
+                    tabButton(tab)
                 }
             }
-            .tabItem { Label("My Plugins", systemImage: "waveform") }
-            .tag(AppTab.library)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 6)
+            .frame(maxWidth: .infinity)
+            .background(.bar)
 
-            PresetsView()
-                .tabItem { Label("Presets", systemImage: "music.note.list") }
-                .tag(AppTab.presets)
-
-            LiveProjectsView()
-                .tabItem { Label("Projects", systemImage: "waveform.badge.exclamationmark") }
-                .tag(AppTab.liveProjects)
+            Divider()
         }
+    }
+
+    private func tabButton(_ tab: AppTab) -> some View {
+        let isSelected = activeTab == tab
+        return Button {
+            activeTab = tab
+        } label: {
+            VStack(spacing: 2) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 15))
+                Text(tab.title)
+                    .font(.system(size: 11))
+            }
+            .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+            .frame(minWidth: 84)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // Without this, macOS gives one of these buttons default keyboard
+        // focus (a visible focus ring) as soon as the window opens. They're
+        // still fully clickable — this only excludes them from focus/tab order.
+        .focusable(false)
+    }
+}
+
+/// Secondary bar for a tab's own actions (buttons, search, etc.), rendered
+/// below `MainTabBar` inside that tab's own content instead of in the
+/// window's unified toolbar — keeps the primary tab bar's position fixed.
+struct TabActionBar<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                content
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+
+            Divider()
+        }
+        .background(.bar)
     }
 }
 
@@ -154,9 +313,6 @@ struct SidebarView: View {
                 }
             }
         }
-        .searchable(text: $manager.searchText, prompt: "Search plugins")
-        .navigationTitle("AudioBunny")
-        .frame(minWidth: 330)
     }
 
     // Plugins are already sorted by name, so identically-named plugins
@@ -277,6 +433,14 @@ struct FilterBar: View {
 struct MergedPluginRowView: View {
     let group: [AudioPlugin]
 
+    // AudioPlugin's @Published status changes don't otherwise trigger this
+    // row to redraw — SwiftUI only tracks that automatically for @ObservedObject,
+    // and holding a plain array of them (to support merged multi-format groups)
+    // doesn't subscribe to any of them individually. Merging every plugin's own
+    // objectWillChange lets a single toggle (unused itself) force a redraw
+    // whenever any of them changes, e.g. when one gets disabled.
+    @State private var refreshTick = false
+
     private var primary: AudioPlugin { group[0] }
 
     private var isAnyEnabled: Bool { group.contains { !$0.isDisabled } }
@@ -291,7 +455,7 @@ struct MergedPluginRowView: View {
         HStack(spacing: 10) {
             if let category {
                 Image(systemName: category.icon)
-                    .foregroundStyle(category == .instrument ? .green : .orange)
+                    .foregroundStyle(isAnyEnabled ? (category == .instrument ? .green : .orange) : .secondary)
                     .frame(width: 18)
                     .help(category.label)
             }
@@ -315,13 +479,17 @@ struct MergedPluginRowView: View {
                 ForEach(group) { plugin in
                     HStack(spacing: 3) {
                         PluginStatusIcon(status: plugin.status)
-                        PluginTypeTag(type: plugin.type)
+                        PluginTypeTag(type: plugin.type, dimmed: !isAnyEnabled)
                     }
                 }
             }
         }
         .padding(.vertical, 2)
         .opacity(isAnyEnabled ? 1.0 : 0.6)
+        .grayscale(isAnyEnabled ? 0 : 1)
+        .onReceive(Publishers.MergeMany(group.map { $0.objectWillChange })) { _ in
+            refreshTick.toggle()
+        }
     }
 }
 
@@ -329,6 +497,7 @@ struct MergedPluginRowView: View {
 
 struct PluginTypeTag: View {
     let type: PluginType
+    var dimmed: Bool = false
 
     var body: some View {
         Text(label)
@@ -336,7 +505,7 @@ struct PluginTypeTag: View {
             .fontWeight(.semibold)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            .background(color, in: RoundedRectangle(cornerRadius: 4))
+            .background(dimmed ? Color.secondary : color, in: RoundedRectangle(cornerRadius: 4))
             .foregroundStyle(.white)
     }
 
@@ -502,6 +671,34 @@ struct PluginDetailView: View {
                     }
                 }
 
+                // Category (only shown when auto-detection couldn't tell instrument vs. effect)
+                if plugin.category == nil {
+                    GroupBox("Type") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("AudioBunny couldn't automatically tell whether this plugin is an instrument or an effect. You can set it manually.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            HStack(spacing: 10) {
+                                Button {
+                                    manager.setCategory(.instrument, for: plugin)
+                                } label: {
+                                    Label(PluginCategory.instrument.label, systemImage: PluginCategory.instrument.icon)
+                                }
+                                .buttonStyle(.bordered)
+
+                                Button {
+                                    manager.setCategory(.effect, for: plugin)
+                                } label: {
+                                    Label(PluginCategory.effect.label, systemImage: PluginCategory.effect.icon)
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        }
+                        .padding(4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
                 // Actions
                 GroupBox("Actions") {
                     VStack(alignment: .leading, spacing: 12) {
@@ -547,7 +744,6 @@ struct PluginDetailView: View {
             }
             .padding()
         }
-        .navigationTitle(plugin.name)
     }
 
     @ViewBuilder

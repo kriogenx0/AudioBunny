@@ -6,28 +6,22 @@ import AppKit
 struct PresetsView: View {
     @EnvironmentObject var presetManager: PresetManager
     @State private var selectedPreset: APIPreset? = nil
-    @State private var showAccountSheet = false
     @State private var showUploadSheet = false
 
     var body: some View {
-        NavigationSplitView {
-            PresetSidebarView(selectedPreset: $selectedPreset)
-        } detail: {
-            if let preset = selectedPreset {
-                PresetDetailView(preset: preset, onInstalled: { selectedPreset = nil })
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "music.note.list")
-                        .font(.largeTitle)
+        VStack(spacing: 0) {
+            TabActionBar(title: "Presets") {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
                         .foregroundStyle(.secondary)
-                    Text("Select a preset")
-                        .foregroundStyle(.secondary)
+                    TextField("Search presets", text: $presetManager.searchText)
+                        .textFieldStyle(.plain)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-        }
-        .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .controlBackgroundColor)))
+                .frame(width: 220)
+
                 if presetManager.currentUser != nil {
                     Button {
                         showUploadSheet = true
@@ -36,12 +30,33 @@ struct PresetsView: View {
                     }
                     .help("Share a preset from your library")
                 }
-                accountButton
             }
-        }
-        .sheet(isPresented: $showAccountSheet) {
-            AccountSheet(isPresented: $showAccountSheet)
-                .environmentObject(presetManager)
+
+            // Plain HStack instead of NavigationSplitView: NavigationSplitView
+            // automatically contributes a sidebar-collapse toggle to the title
+            // bar, and .toolbar(removing: .sidebarToggle) did not reliably
+            // suppress it. This sidebar is always shown, so an HStack avoids
+            // the automatic toolbar item entirely rather than fighting it.
+            HStack(spacing: 0) {
+                PresetSidebarView(selectedPreset: $selectedPreset)
+                    .frame(width: 300)
+
+                Divider()
+
+                if let preset = selectedPreset {
+                    PresetDetailView(preset: preset, onInstalled: { selectedPreset = nil })
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    VStack(spacing: 12) {
+                        Image(systemName: "music.note.list")
+                            .font(.largeTitle)
+                            .foregroundStyle(.secondary)
+                        Text("Select a preset")
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
         }
         .sheet(isPresented: $showUploadSheet) {
             UploadPresetSheet(isPresented: $showUploadSheet)
@@ -50,24 +65,6 @@ struct PresetsView: View {
         .task {
             if presetManager.presets.isEmpty {
                 await presetManager.fetchPresets()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var accountButton: some View {
-        if let user = presetManager.currentUser {
-            Menu {
-                Label(user.username, systemImage: "person.circle.fill")
-                    .font(.headline)
-                Divider()
-                Button("Sign Out") { presetManager.logout() }
-            } label: {
-                Label(user.username, systemImage: "person.circle.fill")
-            }
-        } else {
-            Button { showAccountSheet = true } label: {
-                Label("Sign In", systemImage: "person.circle")
             }
         }
     }
@@ -93,12 +90,9 @@ struct PresetSidebarView: View {
             }
             presetList
         }
-        .searchable(text: $presetManager.searchText, prompt: "Search presets")
         .onChange(of: presetManager.searchText) { _ in
             Task { await presetManager.fetchPresets() }
         }
-        .navigationTitle("Presets")
-        .frame(minWidth: 300)
     }
 
     @ViewBuilder
@@ -296,7 +290,6 @@ struct PresetDetailView: View {
             }
             .padding()
         }
-        .navigationTitle(preset.name)
     }
 
     @ViewBuilder
