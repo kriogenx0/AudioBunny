@@ -1,8 +1,0 @@
-api/.venv
-api/__pycache__
-api/*.db
-api/thumbnails
-api/downloads
-frontend/node_modules
-frontend/dist
-**/*.pyc

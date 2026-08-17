@@ -1,24 +1,5 @@
 APP_NAME       := AudioBunny
 MACOS_DIR      := macos
-WEB_DIR        := web
-
-# make's recipe shell (/bin/sh) only inherits whatever PATH the invoking
-# process happened to have — it does NOT source ~/.zshrc/.zprofile the way an
-# interactive terminal does. Depending on how `make` gets launched (some IDE
-# task runners, launcher apps, etc.), that can be a minimal PATH without
-# Homebrew or Docker Desktop's CLI symlink (/usr/local/bin/docker), causing
-# "docker: No such file or directory" even though docker is installed and
-# working fine in a normal terminal. Make sure both locations are present.
-export PATH := /usr/local/bin:/opt/homebrew/bin:$(PATH)
-
-# The PATH export above only helps if the recipe line actually runs through a
-# shell. Apple ships ancient GNU Make 3.81, which — as an optimization — execs
-# a recipe line *directly* (skipping the shell entirely) whenever the line has
-# no shell metacharacters, and that fast path does its own PATH search using
-# make's PATH snapshot from before this file's export took effect, ignoring
-# the fix above. `docker compose ...` has no metacharacters, so it always hit
-# that fast path. Every such line below ends in `;` (a no-op that's still a
-# shell metacharacter) purely to force real shell execution.
 
 DEBUG_BIN      := $(MACOS_DIR)/.build/debug/$(APP_NAME)
 RELEASE_BIN    := $(MACOS_DIR)/.build/release/$(APP_NAME)
@@ -32,19 +13,15 @@ INSTALL_PATH   := /Applications/$(APP_NAME).app
 VST2PROBER_DEBUG   := $(MACOS_DIR)/.build/apple/Products/Debug/VST2Prober
 VST2PROBER_RELEASE := $(MACOS_DIR)/.build/apple/Products/Release/VST2Prober
 
-.PHONY: all dev build setup clean open close install uninstall reinstall \
-        test test-stress web-up web-down web-logs help
+.PHONY: all dev build clean open close install uninstall reinstall \
+        test test-stress help
 .DEFAULT_GOAL := all
 
 # ── Default ───────────────────────────────────────────────────────────────────
 
-all: setup dev
+all: dev
 
 # ── Development ───────────────────────────────────────────────────────────────
-
-setup:
-	@echo "▸ Starting web stack…"
-	docker compose -f $(WEB_DIR)/docker-compose.yml up -d --build;
 
 dev:
 	@echo "▸ Killing any running $(APP_NAME)…"
@@ -117,25 +94,13 @@ clean:
 	@rm -rf $(MACOS_DIR)/.build
 	@echo "▸ Cleaned build artifacts"
 
-# ── Web (Docker) ──────────────────────────────────────────────────────────────
-
-web-up:
-	docker compose -f $(WEB_DIR)/docker-compose.yml up -d --build;
-
-web-down:
-	docker compose -f $(WEB_DIR)/docker-compose.yml down;
-
-web-logs:
-	docker compose -f $(WEB_DIR)/docker-compose.yml logs -f;
-
 # ── Help ──────────────────────────────────────────────────────────────────────
 
 help:
 	@echo ""
 	@echo "  Development"
-	@echo "    make              Build debug + start web stack + open app  (= make all)"
+	@echo "    make              Build debug + open app  (= make all = make dev)"
 	@echo "    make dev          Build debug, delete old bundle, open app"
-	@echo "    make setup        Start web stack in Docker"
 	@echo ""
 	@echo "  Production"
 	@echo "    make build        Build release bundle"
@@ -154,8 +119,4 @@ help:
 	@echo "  Cleanup"
 	@echo "    make clean        Remove all build artifacts"
 	@echo ""
-	@echo "  Web"
-	@echo "    make web-up       Start Docker web stack"
-	@echo "    make web-down     Stop Docker web stack"
-	@echo "    make web-logs     Tail Docker logs"
-	@echo ""
+	@echo "  Web app moved to ~/Sites/audiobunny-web — see that repo's Makefile."

@@ -1,2 +1,0 @@
----
-BUNDLE_BUILD__PSYCH: "--with-libyaml-include=/opt/homebrew/opt/libyaml/include --with-libyaml-lib=/opt/homebrew/opt/libyaml/lib"

@@ -18,21 +18,3 @@ fastlane/test_output
 # Swift Package Manager
 .build/
 *.app/
-
-# Rails
-web/rails/log/*.log
-web/rails/tmp/
-web/rails/db/*.sqlite3
-web/rails/storage/presets/*
-!web/rails/storage/presets/.keep
-web/rails/.env
-web/rails/config/master.key
-web/rails/config/credentials/*.key
-web/rails/Gemfile.lock
-web/rails/.bundle/
-
-# Frontend
-web/frontend/node_modules/
-web/frontend/dist/
-web/frontend/.env.local
-web/frontend/.env.*.local
