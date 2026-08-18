@@ -16,8 +16,12 @@ struct StoreView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
-                    searchField
-                    filterBar
+                    HStack(spacing: 12) {
+                        searchField
+                        Spacer(minLength: 12)
+                        filterBar
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
                     pluginGrid
                 }
                 .padding(20)

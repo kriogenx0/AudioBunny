@@ -638,6 +638,34 @@ struct PluginDetailView: View {
                         }
                     }
                     Spacer()
+
+                    HStack(spacing: 8) {
+                        Button(action: { manager.testPlugin(plugin) }) {
+                            Label("Test Plugin", systemImage: "play.circle")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(!plugin.canTest)
+
+                        if plugin.status == .testing {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+
+                        if plugin.isDisabled {
+                            Button(action: { manager.enablePlugin(plugin) }) {
+                                Label("Re-enable", systemImage: "checkmark.circle")
+                            }
+                            .buttonStyle(.bordered)
+                            .help("Plugin will be moved back to: \(manager.restorePath(for: plugin.type))")
+                        } else {
+                            Button(action: { manager.disablePlugin(plugin) }) {
+                                Label("Disable", systemImage: "xmark.circle")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.orange)
+                            .help("Plugin file will be moved to: \(manager.disabledFolderURL.path)")
+                        }
+                    }
                 }
                 .padding()
                 .background(Color(nsColor: .controlBackgroundColor))
@@ -697,47 +725,6 @@ struct PluginDetailView: View {
                         .padding(4)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
-
-                // Actions
-                GroupBox("Actions") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Button(action: { manager.testPlugin(plugin) }) {
-                                Label("Test Plugin", systemImage: "play.circle")
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(!plugin.canTest)
-
-                            if plugin.status == .testing {
-                                ProgressView()
-                                    .scaleEffect(0.8)
-                            }
-                        }
-
-                        Divider()
-
-                        if plugin.isDisabled {
-                            Button(action: { manager.enablePlugin(plugin) }) {
-                                Label("Re-enable Plugin", systemImage: "checkmark.circle")
-                            }
-                            .buttonStyle(.bordered)
-                            Text("Plugin will be moved back to: \(manager.restorePath(for: plugin.type))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Button(action: { manager.disablePlugin(plugin) }) {
-                                Label("Disable Plugin", systemImage: "xmark.circle")
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.orange)
-                            Text("Plugin file will be moved to: \(manager.disabledFolderURL.path)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(4)
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 Spacer()
