@@ -1,17 +1,16 @@
 APP_NAME       := AudioBunny
-MACOS_DIR      := macos
 
-DEBUG_BIN      := $(MACOS_DIR)/.build/debug/$(APP_NAME)
-RELEASE_BIN    := $(MACOS_DIR)/.build/release/$(APP_NAME)
-DEBUG_BUNDLE   := $(MACOS_DIR)/.build/debug/$(APP_NAME).app
-RELEASE_BUNDLE := $(MACOS_DIR)/.build/release/$(APP_NAME).app
+DEBUG_BIN      := .build/debug/$(APP_NAME)
+RELEASE_BIN    := .build/release/$(APP_NAME)
+DEBUG_BUNDLE   := .build/debug/$(APP_NAME).app
+RELEASE_BUNDLE := .build/release/$(APP_NAME).app
 INSTALL_PATH   := /Applications/$(APP_NAME).app
 
 # VST2Prober is built universal (arm64 + x86_64) so it can dlopen Intel-only
 # VST2 plugins under Rosetta as well as native arm64 ones — see PluginManager's
 # VST2 category probing.
-VST2PROBER_DEBUG   := $(MACOS_DIR)/.build/apple/Products/Debug/VST2Prober
-VST2PROBER_RELEASE := $(MACOS_DIR)/.build/apple/Products/Release/VST2Prober
+VST2PROBER_DEBUG   := .build/apple/Products/Debug/VST2Prober
+VST2PROBER_RELEASE := .build/apple/Products/Release/VST2Prober
 
 .PHONY: all dev build clean open close install uninstall reinstall \
         test test-stress help
@@ -28,28 +27,28 @@ dev:
 	-killall "$(APP_NAME)" 2>/dev/null
 	@rm -rf $(DEBUG_BUNDLE)
 	@echo "▸ Building $(APP_NAME) (debug)…"
-	cd $(MACOS_DIR) && swift build -c debug
+	swift build -c debug
 	@echo "▸ Building VST2Prober (universal)…"
-	cd $(MACOS_DIR) && swift build -c debug --arch arm64 --arch x86_64 --product VST2Prober
+	swift build -c debug --arch arm64 --arch x86_64 --product VST2Prober
 	@mkdir -p $(DEBUG_BUNDLE)/Contents/MacOS $(DEBUG_BUNDLE)/Contents/Resources
 	@cp $(DEBUG_BIN) $(DEBUG_BUNDLE)/Contents/MacOS/$(APP_NAME)
 	@cp $(VST2PROBER_DEBUG) $(DEBUG_BUNDLE)/Contents/MacOS/VST2Prober
-	@cp $(MACOS_DIR)/Info.plist $(DEBUG_BUNDLE)/Contents/Info.plist
-	@cp $(MACOS_DIR)/AppIcon.icns $(DEBUG_BUNDLE)/Contents/Resources/AppIcon.icns
+	@cp Info.plist $(DEBUG_BUNDLE)/Contents/Info.plist
+	@cp AppIcon.icns $(DEBUG_BUNDLE)/Contents/Resources/AppIcon.icns
 	open $(DEBUG_BUNDLE)
 
 # ── Production ────────────────────────────────────────────────────────────────
 
 build:
 	@echo "▸ Building $(APP_NAME) (release)…"
-	cd $(MACOS_DIR) && swift build -c release
+	swift build -c release
 	@echo "▸ Building VST2Prober (universal)…"
-	cd $(MACOS_DIR) && swift build -c release --arch arm64 --arch x86_64 --product VST2Prober
+	swift build -c release --arch arm64 --arch x86_64 --product VST2Prober
 	@mkdir -p $(RELEASE_BUNDLE)/Contents/MacOS $(RELEASE_BUNDLE)/Contents/Resources
 	@cp $(RELEASE_BIN) $(RELEASE_BUNDLE)/Contents/MacOS/$(APP_NAME)
 	@cp $(VST2PROBER_RELEASE) $(RELEASE_BUNDLE)/Contents/MacOS/VST2Prober
-	@cp $(MACOS_DIR)/Info.plist $(RELEASE_BUNDLE)/Contents/Info.plist
-	@cp $(MACOS_DIR)/AppIcon.icns $(RELEASE_BUNDLE)/Contents/Resources/AppIcon.icns
+	@cp Info.plist $(RELEASE_BUNDLE)/Contents/Info.plist
+	@cp AppIcon.icns $(RELEASE_BUNDLE)/Contents/Resources/AppIcon.icns
 
 open: build
 	-killall "$(APP_NAME)" 2>/dev/null
@@ -80,18 +79,18 @@ reinstall: uninstall install
 
 test:
 	@echo "▸ Building $(APP_NAME) (debug)…"
-	cd $(MACOS_DIR) && swift build -c debug
+	swift build -c debug
 	@echo "▸ Running unit tests…"
-	cd $(MACOS_DIR) && swift test
+	swift test
 
 test-stress: test
 	@echo "▸ Running launch stress test…"
-	$(MACOS_DIR)/scripts/stress_test.sh
+	scripts/stress_test.sh
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
 
 clean:
-	@rm -rf $(MACOS_DIR)/.build
+	@rm -rf .build
 	@echo "▸ Cleaned build artifacts"
 
 # ── Help ──────────────────────────────────────────────────────────────────────

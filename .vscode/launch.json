@@ -4,7 +4,7 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:AudioBunny}/macos",
+            "cwd": "${workspaceFolder:AudioBunny}",
             "target": "AudioBunny",
             "configuration": "debug",
             "preLaunchTask": "swift: Build Debug AudioBunny"
@@ -13,7 +13,7 @@
             "type": "swift",
             "request": "launch",
             "args": [],
-            "cwd": "${workspaceFolder:AudioBunny}/macos",
+            "cwd": "${workspaceFolder:AudioBunny}",
             "target": "AudioBunny",
             "configuration": "release",
             "preLaunchTask": "swift: Build Release AudioBunny"
